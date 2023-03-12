@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Build your own Ruby on Rails Tutorial</title>
+  <meta name="description" content="Learn Ruby and Rails by building your own simple web framework. Tutorial"> 
+  <meta name="keywords" content="Ruby on Rails, Web Framework Tutorial">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Make It a Gem <small style="padding-left: 25px;">Build Your Own Rails - Part 7</small></h1>
+  <p>Learn Ruby and Rails by building your own very simplistic Rails-like Framework.</p>
+  <p><a href="build_rails_6">Back to Part 6</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<p>Right now we have a fully functioning Web application that uses the MVC architecture. Our framework code is all in the lib folder under the Jails namespace. We could add other resources to our blog app besides articles, such as one for comments, and inherit from the same Jails framework classes and modules. If we wanted to make another app using our framework library we could copy the whole lib folder over to the new app, or just recode it all. Not exactly adhering to the DRY (don't repeat yourself) philosophy. So let's separate the Jails library from our Blog app into it's own gem. </p>
+
+<p><b>rubygems module:</b> The Ruby process for packaging a library for repeat use is to make it into a gem. Rubygems is Ruby's package manager module that is included in the Ruby standard library. You call Rubygems methods from the terminal with commands that begin with <i>gem</i>. Common commands include <code>gem list</code>, <code>gem install <i>gemname</i></code>, <code>gem update <i>gemname</i></code>, <code>gem uninstall <i>gemname</i></code>. If you are using a version manager like rvm or rbenv, it will create specific directories on your computer to save and retrieve your gems.</p>
+<p><b>rubygems.org:</b> Ruby's repository for publicly available gems is at <a href="https://rubygems.org/">rubygems.org</a>. And if you look at the Gemfile we generated with Bunder, at the top you'll see <code>source "https://rubygems.org"</code>. That tells bundler to use rubygems.org to load the gems listed in our gemfile when we call bundle install. You can override this for specific gems and include the url or path to load the gem from. This is often done for gem versions that are still in beta but available on github. You can also load a gem directly from your own computer if you have a copy of it like we do.</p>
+<p>Let's start by creating some boilerplate code for our gem. We started this project by creating a folder called jailsfolder which we put our blog project under. In your terminal, cd back to the jailsfolder directory <code>cd .. </code>. From here we could create the boilerplate files we need from scratch, but there is a bundler command to do it for us:
+<code class="pre">bundle gem jails</code></p>
+<p>This did a lot for us. For instance it generated a local git repository. We aren't covering git in this tutorial but feel free to use it. It has some testing files set up. Of course testing is important and for a public gem you definitely won't want to publish it without a good set of tests. But we're skipping testing in this tutorial. But look what it also has. A library folder called <i>lib</i> that contains a jails.rb file and a jails directory. It's no coincidence that we organized our Jails MVC framework library to fit this structure.</p>
+<p>Open the file called jails.gemspec. This is where RubyGems.org gets its meta information about a gem to display on it's site. You'll need to make some modifications and additions to the specifications in this file. Change the author and email if needed. Add the summary and description. Something like:</p>
+<pre>
+spec.summary       = %q{For-learning-purposes-only web application framework.}
+spec.description   = %q{Ruby in Jails is a cheap, primitive, amateur, attempt at a Web MVC framework strictly for learning purposes.}
+</pre>
+
+<pre>
+spec.homepage      = "TODO: Put your gem's website or public repo URL here."
+spec.license       = "MIT"
+</pre>
+<p>You can leave the homepage out since this is for your own use.<br>
+The MIT licence essentially means some guy named Mit will own your gem. But Mit's pretty cool and lets anyone use the gem for free and doesn't hold you liable for any trouble your gem causes. <br>
+I'm just kidding... Mit's not cool at all. You'll start getting letters from Mit's attorney demanding immediate payments. You might even see Mit following you around in his car. Okay, I've driven that joke far enough. MIT is a pretty standard license for open source software. A copy was added to your gem package by bundler - LICENSE.txt.</p>
+<p>We need to list all the files to include in our gem under the <i>files</i> specification. The bundler boilerplate automates this by getting them from our .git file. Since we are not using git, change spec.files to the below. The Dir.glob method (and it's Dir[] shortcut) allows us to use * wildcards to get everything from the lib folder:
+<code class="pre">spec.files = Dir["CHANGELOG.md", "LICENSE.txt", "Rakefile","README.md", 'jails.gemspec', "lib/**/*"]</code></p>
+
+<p>Notice at the bottom there are development dependencies for bundler, rake, and minitest gems. Those are for use with the Jails gem in the development environment. In our Blog app's Gemfile we added the rack and sqlite3 gems. But now that we are breaking Jails out into it's own separate package we have to decide which gems belong with the app and which belong with the jails gem. If it's essentially part of the framework than it should probably be a direct dependency of the Jails gem. Jails relies on the Rack gem so that needs to be a runtime_dependency of the Jails gem. And indeed the Rails ActionPack gem has Rack as a dependency in it's actionpack.gemspec file. What about the Puma webserver gem? No, that stays with the application. We can leave the default Webrick webserver in our Jails framework. If the user wants to change it to Puma they can just add the Puma gem to their applications Gemfile. The Sqlite3 gem could go either way since we currently only offer one database option. But for Rails apps, Sqlite3 gem goes in the application's Gemfile so we'll follow suit. We'll only add rack as a runtime dependency to our jails jem. Add this to the bottom of the gemspec file:
+<code class="pre">spec.add_dependency "rack",      "~> 2.0"</code>
+add_dependency is an alias for add_runtime_dependency so either method works.</p>
+<p>You may notice that our new Jails gem also has a Gemfile. That's a little confusing since we are listing our gem dependencies in the jails.gemspec file. Our dependency gems will get loaded whether we put them in jails.gemspec or in the Gemfile, so does it matter where we put them? Well, one difference is gems listed as dependencies in jails.gemspec would get listed on it's rubygems.org page, while gems in its Gemfile won't. So we'll just ignore the Gemfile.</p>
+<p>Gems use the semantic versioning system which uses three groups of digits separated by dots: <b>Major.Minor.Patch</b>. The major version is for major changes to the code that will break apps using an earlier major version without modifying the app. The minor version is for changes in functionality that won't break apps using earlier versions. The patch version is for changes that don't add any notable functionality like bug fixes. If you go to the lib/jails/version.rb file you'll see that bundler set a default version of 0.1.0 which is commonly used for an initial development release version.</p>
+<p>Now let's move the files from the Blog app's lib folder to the Jails gem's lib folder. If you want to do it from the terminal with the UNIX move command, first check what directory you are in with the <i>present working directory</i> command <code>pwd</code>. Assuming you are in the jailsfolder enter the below.</p>
+<pre>
+mv blog/lib/jails/controller.rb jails/lib/jails/controller.rb
+mv blog/lib/jails/hacktive_record.rb jails/lib/jails/hacktive_record.rb
+mv blog/lib/jails/routing.rb jails/lib/jails/routing.rb
+mv blog/lib/jails/support.rb jails/lib/jails/support.rb
+mv blog/lib/jails.rb jails/lib/jails.rb
+</pre>
+<p>You no longer need the lib/jails directory in your Blog folder. You can remove it with: 
+<code class="pre">rmdir blog/lib/jails</code></p>
+<p>One thing to remember about the UNIX mv command. It will override the existing file if there is one, and there is no backup. And in fact we did override the lib/jails.rb file which left our versioning broken. So we'll fix that by requiring the version file. And for our other jails files, instead of using require_relative, we'll use require. That's because the jails.gemspec file adds our lib folder to the $LOAD_PATH. Change the top section of lib/jails.rb to:</p>
+<pre>
+<b># lib/jails.rb</b>
+require('jails/version.rb')
+require('jails/support.rb')
+require('jails/routing.rb')
+require('jails/controller.rb')
+require('jails/hacktive_record.rb')
+...
+</pre>
+
+<p>Make sure all your files are saved and ready to go. Once your gem is ready you can build it. In the terminal go into the jails directory <code>cd jails</code> and build the gem:
+<code class="pre">gem build jails.gemspec</code>
+Now you'll see a file named jails-0.1.0.gem. Open it up and it's all hexidecimal characters (1-10 and a-f). Now it's a gem on your local machine. but you need to install it in your local gem repository:
+<code class="pre">gem install jails-0.1.0.gem</code>
+</p>
+
+<p>Now that our jails library has been removed from our Blog app and is a gem, we need to add it to our Blog app's gemfile. Also, since the Rack gem is now a dependency in jails.gemspec, it will be loaded as a dependency when we load the jails gem, so we can remove it from the Blog Gemfile. Our Blog Gemfile file should be:</p>
+<pre>
+<b># Gemfile</b>
+source "https://rubygems.org"
+
+git_source(:github) {|repo_name| "https://github.com/#{repo_name}" }
+
+# Web MVC Framework
+gem "jails"
+# Ruby webserver - works in development and production.
+gem "puma"
+# Ruby interface to the lightweight SQLite3 embedded database engine.
+gem "sqlite3"
+</pre>
+<p>The <code>git_source(:github) {|repo_name| "https://github.com/#{repo_name}" }</code> is autogenerated by bundler for when you use Github as a source for a gem so that it uses https instead of http.</p>
+<p>Now run <code>bundle install --local</code> and it will install the local versions of your gems without looking on rubygems.org. We've already installed the Puma and Sqlite3 gems so they should be available locally, and of course we just installed jails locally. Now if you check your gemfile.lock file you should see the gems and their dependency gems all listed, including their versions. Gemfile.lock is the list of all gems needed to run your app, from the Gemfile and any dependencies that those gems have. When you install a gem with bundler, it installs not just the gem, but also it's dependencies, and the dependencies of the dependencies, etc. That's why bundler is such a useful tool.</p>
+<p>Change the boot file to require the trails gem rather than the relative path to the lib folder.</p>
+<pre>
+<b># config/boot.rb</b>
+require_relative('routes.rb')
+<b>require('jails')</b>
+Dir[File.join(__dir__, '..', 'app', 'controllers', '*.rb')].each {|file| require(file) }
+Dir[File.join(__dir__, '..', 'app', 'models', '*.rb')].each {|file| require(file) }
+</pre>
+
+<p>Stop the server (control+c) and restart it (<code>rackup</code>), then refresh the browser (localhost:9292). It should work. If so, you've done it! If you are sitting at a Starbucks tell the person next to you what you've done.</p><br>
+
+<p>Actually, while we're here, I should mention. Now that Jails is a gem, any changes you make to it will require you to update the version number in the Jails lib/jails/version.rb file, rebuild the gem, uninstall the old version on your machine, reinstall the new version, then reinstall it locally in your app. That's a hassle. An easier way if you are making updates to your own gem is to just change the source in the Gemfile to the local folder like this:</p>
+<pre>
+<b># Gemfile</b>
+...
+gem 'jails', path: '../jails'
+...
+</pre>
+<p>And uninstall the gem from the terminal <code>gem uninstall jails</code> <br>
+And in the Blog app directory do a <code>bundle install</code> to change the gem source.<br>
+Now you can make changes to the Jails gem and they will be in effect in the Blog app just by restarting the server.</p><br>
+
+<p>Finally, the jails gem is actually available on rubygems.org. You should be able to install it for the Blog app like any gem. Put it in your Gemfile:</p>
+<pre>
+<b># Gemfile</b>
+...
+gem 'jails'
+...
+</pre>
+<code>bundle install</code>
+<p>And it should plug right into your Blog app.</p>
+
+<hr class="space">
+<h2>Conclusion</h2>
+<p>My recommendation is to go through this code until you understand it completely. And to really help understand it, add features. Like more Support module methods, adapters for different databases besides Sqlite, well, there's limitless things you could add. And you could add other resources to the Blog app like comments. Or make a different app but still using the same structure as our Blog app, and adding your jails gem.</p>
+<p>If you are like me, building your own Rails-like MVC framework makes it soooo much easier to understand Rails and Ruby both. And now you can open up third-party gems and know your way around too. Hope you found this exercise as useful as I did. Cheers.</p>
+</div>
+</div>
+</body>
+</html>

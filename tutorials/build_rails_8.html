@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Build your own Ruby on Rails Tutorial</title>
+  <meta name="description" content="Learn Ruby and Rails by building your own simple web framework. Tutorial"> 
+  <meta name="keywords" content="Ruby on Rails, Web Framework Tutorial">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Testing <small style="padding-left: 25px;">Build Your Own Rails - Part 8</small></h1>
+  <h2 style="color:red;">This section is an early Work-in-Progress Draft</h2>
+  <p>Learn Ruby and Rails by building your own very simplistic Rails-like Framework.</p>
+  <p><a href="build_rails_7">Back to Part 7</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<h3>Overview</h3>
+<p>I won't go into the benefits of testing. Everyone agrees it's useful, and for published gems, it's expected to have a full testing suite to ensure it works properly and doesn't break somewhere when a change is made. Testing is a pretty involved topic and I was originally going to skip it for that reason. However, creating tests on our simple framework is a good way to both better understand our code, and to get a stripped down understanding of the test environment as well.</p> 
+<p>We will start by testing our initial Rack app that we created in Part 1. Then we'll test our blog app. We won't go too deep into testing however. To keep it simple, we won't create a separate test database or use fixures to populate data. And we'll test our framework through our Blog app.</p>
+<p><b>RSpec vs. Minitest testing frameworks:</b> Ruby in the early days shipped with a testing framework called TestUnit, which many developers found lacking. The RSpec gem, first released in 2005, became the de facto standard testing framework in the Rails community. Another Ruby testing framework called Minitest was first released as a gem in 2008. And in 2010, Minitest was added to the Ruby standard library starting with Ruby version 1.9.2. Minitest is a leaner version of TestUnit, that also offers the option of using a spec syntax similar to RSpec. Minitest has been steadily gaining popularity in the Ruby and Rails communities, but RSpec is still very popular. I mean, if a developer has been using RSpec for years and knows it very well, why switch? Well, I won't weigh into a debate about which framework is better. Let's just say they are both good, but since Ruby ships with Minitest, we are going to use Minitest.</p>
+<p><b>Minitest Reference:</b> <br>
+<a href="https://github.com/seattlerb/minitest">Minitest Home Page</a> <br>
+<a href="http://www.rubydoc.info/gems/minitest/5.8.4/Minitest/Assertions">Minitest: Assertions</a><br>
+<a href="http://www.rubydoc.info/gems/rack/Rack/MockRequest">Rack - MockRequest</a> |
+<a href="http://www.rubydoc.info/gems/rack/Rack/MockResponse">Rack - MockResponse</a>
+<!-- tutorial: https://www.smashingmagazine.com/2014/04/how-to-build-a-ruby-gem-with-bundler-test-driven-development-travis-ci-and-coveralls-oh-my/
+Check out the Pry intro video: http://pryrepl.org/ -->
+</p>
+
+<hr class="space">
+<h3>Test the Rackapp from Part 1</h3>
+<p>Minitest gives a few syntax options. The Spec syntax is similar to Rspec and reads a little more like English. The Unit Test syntax looks like standard Ruby code where your test suite is in a class and each test is a method. We will use both formats as a comparison. From the rackapp folder create two test files: <br>
+<code class="pre">touch unit_test.rb</code>
+<code class="pre">touch spec_test.rb</code>
+</p>
+
+<p>Populate the unit_test file with the below:</p>
+<pre>
+<b># unit_test.rb</b>
+require "rack"
+require "minitest/autorun"
+require File.join(__dir__, "config/application.rb")
+
+class TestApplication < Minitest::Test
+  def setup
+    @request = Rack::MockRequest.new(Application.new)
+  end
+  
+  def test_that_valid_path_returns_200
+    assert_equal(200, @request.get("/").status)
+  end
+
+  def test_that_home_displays_cookie
+    assert_match(/cookie: name=/i, @request.get("/").body)
+  end
+
+  def test_that_home_displays_link
+    assert_includes(@request.get("/").body, "&lt;a href='/redirect-me'>Redirect to build-response&lt;/a>")
+  end
+
+  def test_that_home_displays_cookie_value
+    refute_match(/Cookie: name=Joey/, @request.get("/").body)
+    assert_includes(@request.get("/", "HTTP_COOKIE" => "name=DeeDee").body, "Cookie: name=DeeDee")
+  end  
+
+  def test_that_setcookie_sets_cookie_and_redirects_to_root
+    response = @request.post("/set-cookie", "HTTP_REFERER" => "/", params: {"name" => "Joey"}) 
+    assert_equal(302, response.status)
+    assert_equal("/", response["Location"])
+    assert_includes(response["Set-Cookie"], "name=Joey")
+  end
+
+  def test_that_deletecookie_deletes_cookie_and_redirects_to_root
+    response = @request.get("/delete-cookie", "HTTP_COOKIE" => "name=Joey", "HTTP_REFERER" => "/")
+    assert_equal(302, response.status)
+    assert_equal("/", response["Location"])
+    assert_includes(response["Set-Cookie"], "name=")
+  end
+
+  def test_that_redirect_redirects_to_buildresponse
+    response = @request.get("/redirect-me")
+    assert_equal(302, response.status)
+    assert_equal("/build-response", response["Location"])
+  end
+
+  def test_that_buildresponse_returns_expected_response
+    response = @request.get("/build-response")
+    assert_match(/home/i, response.body)  
+    assert_equal(200, response.status)
+    assert_equal("text/html", response["Content-Type"])
+    assert_equal("Some info", response["Custom-Header"])
+    assert_includes(response["Set-Cookie"], "name=Sheena")
+  end
+
+  def test_that_bad_path_returns_404
+    assert_equal(404, @request.get("/badpath").status)
+  end
+
+  def test_that_will_be_skipped
+    skip "test this later"
+  end
+end
+</pre>
+<p>Run the test file from the rackapp directory in the terminal <code class='cli'>ruby unit_test.rb</code></p>
+<p>These should all pass. Some programmers prefer creating separate tests for each assertion like we did for the root url "/". For the other URLs, though, we put all the assertions for a path into one test similar to how integration testing is done.</p>
+
+<p>Rack has Mock Request and Mock Response classes to use for testing to simulate a request and response.</p>
+<h5>Mock GET Requests</h5>
+<p>To simulate a get request, Rack MockRequest offers a get method:<br>
+Syntax: <code>get(uri, opts = {}) ⇒ Object</code><br>
+Which you can use to simulate a GET request to a URL:<br>
+<code class="pre">@request.get("/")</code>
+And add options like setting the cookie value. <br>
+<code class="pre">@request.get("/", "HTTP_COOKIE" => "name=DeeDee")</code>
+</p>
+<h5>Mock POST Requests</h5>
+<p>Similarly, Rack MockRequest also offers a POST method to simulate a POST request:<br>
+Syntax: <code>post(uri, opts = {}) ⇒ Object</code><br>
+Which you can use to simulate submitting a form to the specified URL. Below we are adding the referer field to our simulated request so that a redirect knows where to go. The form data goes under the params field as a hash of key-value pairs.<br>
+<code class="pre">@request.post("/set-cookie", "HTTP_REFERER" => "/", params: {"name" => "Joey"}) </code>
+</p>
+
+<h5>Mock env Variable</h5>
+<p>Rack's <i>env_for</i> class method returns the MockRequest environment for a given URL letting you see what would be in the <i>env</i> variable.<br>
+Syntax: <code>.env_for(uri = "", opts = {}) ⇒ Object</code><br>
+For example the below MockRequest simulated environment:
+<code class="pre">Rack::MockRequest.env_for(uri = "/articles?title=Ruby", opts = {"HTTP_REFERER" => "/", "HTTP_COOKIE" => "name=Joey"})</code>
+Would return "QUERY_STRING"=>"title=Ruby", "PATH_INFO"=>"/articles", "HTTP_REFERER"=>"/", "HTTP_COOKIE"=>"name=Joey", among other fields.
+</p>
+
+<h5>View Variables using Puts</h5>
+<p>You can add puts statements in your tests to see what is in the variables.</p>
+<pre>
+# Use puts to see request and response data.
+def test_that_setcookie_sets_cookie_and_redirects_to_root
+  <b>puts @request</b>
+  <b>puts "-" * 50</b>
+  response = @request.post("/set-cookie", "HTTP_REFERER" => "/", params: {"name" => "Joey"}) 
+  <b>puts Rack::MockRequest.env_for("/articles?author=Steve", "HTTP_REFERER" => "/", "HTTP_COOKIE" => "name=Joey")</b>
+  <b>puts "-" * 50</b>
+  <b>puts response</b>
+  <b>puts "-" * 50</b>
+  assert_equal(302, response.status)
+  assert_equal("/", response["Location"])
+  assert_includes(response["Set-Cookie"], "name=Joey")
+end
+</pre>
+
+<h4>Spec style test.</h4>
+<p>Let's run these same tests with Minitest's spec syntax:</p>
+<pre>
+<b># spec_test.rb</b>
+require "rack"
+require "minitest/autorun"
+require File.join(__dir__, "config/application.rb")
+
+describe Application do
+  before do
+    @request = Rack::MockRequest.new(Application.new)
+  end
+
+  # Multiple tests for one resource
+  it "returns a 200 response for valid path / request" do
+    @request.get("/").status.must_equal(200)
+  end
+
+  it "/ displays text" do
+    @request.get("/").body.must_match(/Cookie: name=/)
+  end
+
+  it "/ includes to build-response link" do
+    @request.get("/").body.must_include("Redirect to build-response")
+  end
+
+  it "/ displays cookie value when added" do
+    @request.get("/").body.wont_match(/Cookie: name=Joey/)
+    @request.get("/", "HTTP_COOKIE" => "name=Johnny").body.must_include("Cookie: name=Johnny")
+  end
+
+  it "/set-cookie sets cookie and redirects to root" do
+    response = @request.post("/set-cookie", "HTTP_REFERER" => "/", params: {"name" => "Joey"}) 
+    response.status.must_equal(302)
+    response["Location"].must_equal("/")
+    response["Set-Cookie"].must_include("name=Joey")
+  end
+
+  it "/delete-cookie deletes cookie and redirects to root" do
+    response = @request.get("/delete-cookie", "HTTP_COOKIE" => "name=Joey", "HTTP_REFERER" => "/")
+    response.status.must_equal(302)
+    response["Location"].must_equal("/")
+    # puts "Cookie after delete: " + response["Set-Cookie"]
+    response["Set-Cookie"].must_include("name=")
+  end
+
+  it "/redirect redirects to /build-response" do
+    response = @request.get("/redirect-me")
+    response.status.must_equal(302)
+    response["Location"].must_equal("/build-response")
+  end
+
+  it "/build-response returns expected response" do
+    response = @request.get("/build-response")
+    response.body.must_match(/Home/)    
+    response.status.must_equal(200)
+    response["Content-Type"].must_equal("text/html")
+    response["Custom-Header"].must_equal("Some info")
+    response["Set-Cookie"].must_include("name=Sheena")
+  end
+
+  it "returns a 404 response for bad path requests" do
+    @request.get("/badpath").status.must_equal(404)
+  end
+end
+</pre>
+<p>Run test files <code class='cli'>ruby spec_test.rb</code></p>
+<p>With the spec syntax each test is a block rather than a method. And they use the expectation syntax as opposed to the assert/refute syntax. <code>.must_equal()</code> vs. <code>assert_equal()</code>.</p>
+
+<p>You can use assertions with the Spec blocks as well:</p>
+<pre>
+# Assertions work with specs:
+it "returns 200 response for valid path / request" do
+  assert_equal(200, @request.get("/").status)
+end
+</pre>
+<p>As mentioned, Rails uses Minitest as its default testing framework. But they add onto it with testing classes in the ActiveSupport module. Rails tests use blocks with assertions like the example above except instead of each test block starting with "it" they start with "test."</p>
+
+
+<hr>
+<h3>Test Jails and the Blog app</h3>
+<p>Since the Jails framework is fully integrated with the apps that use it, we'll test the framework with the blog app as the example application. Cd from the rackapp directory to the blog directory then create the following files and directory:</p>
+<pre>
+cd ../blog
+touch Rakefile
+mkdir test
+touch test/application_test.rb
+</pre>
+
+<p>Populate the test file:</p>
+<pre>
+<b>test/application_test.rb</b> 
+
+
+</pre>
+
+<p>Run test file: <code class='cli'>ruby test/application_test.rb</code></p>
+
+
+See the Rack MockRequest environment for a given URI. This is a class method.
+.env_for(uri = "", opts = {}) ⇒ Object
+puts Rack::MockRequest.env_for(uri = "/articles?author=Steve", opts = {"HTTP_REFERER" => "/", "HTTP_COOKIE" => "name=Joey"})
+get(uri, opts = {}) ⇒ Object
+response = @request.get("/set-cookie", "HTTP_REFERER" => "/")
+
+
+<hr>
+<h3>Rake</h3>
+<p>
+<b>Reference:</b> 
+Homepage: <a href="https://github.com/ruby/rake">github.com/ruby/rake</a><br>
+Docs: <a href="https://ruby.github.io/rake/">ruby.github.io/rake</a>
+</p>
+<p>
+Rake is a software task management and build automation tool. It allows the user to specify tasks and describe dependencies as well as to group tasks in a namespace. It was inspired by <i>Make</i> for UNIX/Linux. Rake is part of Ruby's standard library.
+</p>
+<p>Rake uses Ruby's anonymous function blocks to define various tasks, allowing the use of Ruby syntax. It has a library of common tasks, and can synthesize tasks based on patterns. We will set up a rake task for running our tests.</p>
+<p>Create a Rakefile:<br>
+<code class="cli">touch Rakefile</code><br>
+Then populate it with:</p>
+<pre>
+<b># Rakefile</b>
+require 'rake/testtask'
+
+Rake::TestTask.new do |t|
+  t.libs << 'test'
+  t.test_files = FileList["test/*_test.rb"]
+end
+
+desc "Run tests"
+task :default => :test
+
+# to run tests $ rake test
+</pre>
+<p>Run the tests using the rake task: <code class='cli'>rake test</code></p>
+
+</div>
+</div>
+</body>
+</html>

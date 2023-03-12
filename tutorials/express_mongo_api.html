@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Build an API with Node.js, Express and MongoDB Tutorial</title>
+  <meta name="description" content="Part 1 of a 2 part series on building a MERN (Mongo-Express-React-Node) app with all four CRUD actions (Create-Read-Update-Delete)"> 
+  <meta name="keywords" content="Node API, MERN App, Node.js, Express, MongoDB, React, CRUD app, tutorial">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Build an API with Node.js, Express and MongoDB Tutorial</h1>
+  <p>Part 1 of a 2 part series on building a MERN (Mongo-Express-React-Node) app with all four CRUD actions (Create-Read-Update-Delete).</p>
+  <p>By Steve Carey - 7/9/2019</p>
+  This Tutorial covers:
+  <ul>
+    <li><a href="#setup">Project Setup</a></li>
+    <li><a href="#express">Express Web Framework</a></li>
+    <li><a href="#mongo">MongoDB Database</a></li>
+    <li><a href="#routes">Routing</a></li>
+    <li><a href="#curl">Test our API with Curl or Postman</a></li>
+  </ul>
+  <p>Finished code: <a href="https://github.com/steve981cr/mern-app">Github</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<h2></h2>
+
+<h2 id='setup'>Project Setup</h2>
+<p>In this 2-part tutorial series we will build a simple articles app to execute all four CRUD actions in the context of a MERN stack. Part 1 covers the API and can be done without doing Part 2.</p> 
+
+<p>This tutorial assumes you are familiar with JavaScript, know how to use the command line, and have Node.js installed on your computer. First your version of Node.js should be recent. To see your version, go to the command line and run <code>node -v</code> (returning a version means node is at least installed). Compare that to the latest LTS version from <a href="https://nodejs.org/en/">nodejs.org</a> and upgrade if it's a major release (first digit) behind for sure.</p>
+
+<p class='mb-1'>Create a directory for your project and cd into it. We'll call it mern-app-tutorial (or whatever you want to call it).</p>
+<li class="dlr"><code>mkdir mern-app-tutorial && cd mern-app-tutorial</code></li>
+<p class='mt-3 mb-1'>Create the files for our API. You can use these UNIX commands from the command line, or do it in your text editor if you prefer. <code>Mkdir</code> creates a directory and <code>touch</code> creates a file.</p>
+<pre>
+touch server.js
+mkdir models
+touch models/article.js
+mkdir routes
+touch routes/index.js
+</pre>
+
+<hr>
+<h4>Package.json</h4>
+<p class='mb-1'>Generate a <a href="https://docs.npmjs.com/files/package.json">package.json file</a>. This file contains the metadata for a Node.js project. Adding the --yes flag will use the defaults for the fields.</p>
+<li class="dlr"><code>npm init -y</code></li>
+<p class='mt-3 mb-1'>Install our npm packages. First the global packages. These get installed on your system and not attached to any specific project. The Nodemon package will allow you to do hot reloading of your app, which means it will restart the server every time you make a change and save it in your project. The --global or -g flag makes it global. If you already have it installed this will upgrade it to the latest version.</p>
+<li class="dlr"><code>npm install -g nodemon</code></li>
+<p class='mt-3 mb-1'>Local packages will be installed directly in your project, in the node_modules folder. Install the following packages: </p>
+<li class="dlr"><code>npm install express mongoose</code></li>
+<ul>
+  <li>Express lightweight web framework.</li>
+  <li>Mongoose middleware for connecting to the MongoDB database in an object oriented manner.</li>
+</ul>
+
+<p>Your package.json file should look something like the below. A list of the project's installed packages with version and their dendencies is saved under dependencies. If we ran <code>npm install</code> then npm would attempt to install or update the packages listed there.</p>
+<p>Make sure the "main" property's value is "server.js". Change it if it isn't.</p>
+<p>Also make sure you have the "start" script. Add it if you don't. We can run the commands in the scripts object from the command line with <code>npm run <i>script-name</i></code>. I'll explain more in the next section.</p>
+<pre>
+<span>// package.json</span>
+{
+  "name": "mern-app-tutorial",
+  "version": "1.0.0",
+  "description": "Web app built with Node.js, Express, MongoDB, and React",
+  <b>"main": "server.js",</b>
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    <b>"start": "node server.js"</b>
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.17.1",
+    "mongoose": "^5.6.6"
+  }
+}
+</pre>
+<p>You will also see a file named package-lock.json. That lists all the project's installed packages with their versions and their dendencies.</p>
+
+<hr>
+<h2 id="express">Express Web Framework</h2>
+<h4>Server.js</h4>
+<p>Populate the server.js file with a hello world app powered by Express:</p>
+<pre>
+<span>// server.js</span>
+const express = require('express');
+const app = express();
+const PORT = 3001;
+
+app.get('/', function(request, response) { response.send('Hello World!') });
+
+app.listen(PORT, function() { console.log(`Server listening on port ${PORT}`) });
+</pre>
+<p class='mt-3 mb-1'>This simple file, with the Express library, will create a server. There are a few different commands you can use to run it. I'll cover them briefly. First there is a standard node command to execute any file:</p>
+<li class="dlr"><code>node server.js</code> or just <code>node server</code></li>
+<p>This should log "Server listening on port 3001" in the terminal, and if you open a browser to localhost:3001 you should get "hello world". To stop the server, from the terminal press CTRL+C,</p>
+<p class='mb-1'>NPM init generated a script to run this command in our package.json file. You call the scripts in your package.json file with <code>npm run <i>script-name</i></code> or in a few cases "run" is optional.</p>
+<li class="dlr"><code>npm start</code></li>
+<p class='my-1'>The third way to execute the server.js file is to use the nodemon command. We installed nodemon for hot reloading. To use it just enter <code>nodemon</code> and it looks for a file named server.js to run by default. This is the command we'll use throughout this tutorial.</p>
+<li class="dlr"><code>nodemon</code></li>
+
+<p>A quick note on syntax. Node recognizes most, but not all, ES6 syntax. Notably it does not recognize import/export statements, so we won't use them here. You have the option of installing Babel which will translate it for you. Since it's not critical to this tutorial we won't do it. Also, as default I am using the declaration syntax for functions rather than arrow functions. That just makes it consistently explicit what your function is returning or if it isn't returning anything.</p>
+
+<hr>
+<div id="mongo"></div>
+<script>
+const partial = document.getElementById('mongo');
+fetch('_mongo.html')
+  .then((response) => response.text())
+  .then((body) => partial.innerHTML = body);
+</script>
+
+<hr>
+<h4>Mongoose ORM</h4>
+<p>We installed the mongoose package in our app. Mongoose is a middleware library that performs the Object Relational Mapping (ORM) between our Express application and MongoDB. In essence it does the translations allowing them to talk to each other.</p>
+
+<p>We'll start by using Mongoose to connect to MongoDB in our server file. Let's replace the hello world response with our real code and then we'll go through it line by line.</p>
+<pre>
+<span>// server.js</span>
+const express = require('express'); <span>                         #1</span>
+const mongoose = require('mongoose');
+// const cors = require('cors');
+const router = require('./routes/index');
+
+const app = express(); <span>                                      #2</span>
+const PORT = 3001; <span>                                          #3</span>
+const MONGODB_URI = "mongodb://localhost:27017/my_local_db"; <span>#4</span>
+
+// app.use(cors())
+app.use(express.urlencoded({ extended: true })); <span>            #5</span>
+app.use(express.json());
+app.use('/api', router); <span>                                    #6</span>
+
+mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useFindAndModify: false }); <span>   #7</span>
+mongoose.connection.once('open', function() { <span>               #8</span>
+  console.log('Connected to the Database.');
+});
+mongoose.connection.on('error', function(error) {
+  console.log('Mongoose Connection Error : ' + error);
+});
+
+app.listen(PORT, function() { <span>                               #9</span>
+  console.log(`Server listening on port ${PORT}.`);
+});
+</pre>
+<ol>
+<li>Start by importing our express and mongoose packages and our Express router which we'll define shortly.</li>
+<li>Calling the express() function will create our running app object.</li>
+<li>The Express listen method called at the bottom of our file uses 3000 as it's default port for it's server. We'll declare a new PORT constant to give us the flexibility to use different ports depending on whether we are in development or production.</li>
+<li>Assigning constants for things like port number and the database URL gives us the flexibility to change the values in one place.<br>
+  If you are using the MongoDB Atlas cloud database then paste the link there.<br>
+  If you are using the local version, MongoDB is accessed through localhost on port 27017 by default, and the path is the database name. We'll just call ours my_local_db.</li>
+<li>Chaining Express's <a href="http://expressjs.com/en/api.html#app.use">use method</a> to our app object gives us access to the libraries we imported. <code><a href="http://expressjs.com/en/api.html#express.urlencoded">express.urlencoded({ extended: true })</a></code> and <code><a href="http://expressjs.com/en/5x/api.html#express.json">express.json()</a></code> are middleware for parsing requests with JSON payloads (for POST and PATCH/PUT requests).</li>
+<li>Apply the Express router object to your Express app. I'll explain this in the routing section.</li>
+<li><code>mongoose.connect()</code> connects to our MongoDB database</li>
+<li>Optionally, log a message if the above connection was successful and one if it is not.</li>
+<li>Chain the Express <a href="http://expressjs.com/en/api.html#app.listen_path_callback">listen method</a> to our app. This will listen for connections on the specified port.</li>
+</ol>
+
+<h4>Cors</h4>
+<p>Let's talk briefly about Cross-Origin Resource Sharing (CORS). By default Express will block cross-origin HTTP requests for security reasons. Cross-origin means the request is from a different origin (domain, protocol, and/or port) than its own origin. Our API is served on localhost port 3001. If our API is accessed by mobile apps for example they will be on a different origin and any requests will be rejected. There is an npm package called cors that will apply additional HTTP headers to tell the browser to allow access from a specified origin or any origin.</p>
+<p>A standard MERN app is really an integrated single web application even if the back end and front end run independently. We only want to give access to the integrated front end (our React client in this case) and therefore won't use the cors package. There's an additional step when we build the React app that we'll cover there.</p>
+<p class='mb-1'>If, however, your API is meant to be accessed by mobile apps or other websites then you need to install the cors middleware package and connect it to your app.</p>
+<li class="dlr"><code>npm install cors</code></li>
+<p class='mt-3'>The server.js file comments out the cors package import and where it is applied to the app. To allow cross origin access uncomment those lines.</p>
+<p>For more on the CORS concept see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS">developer.mozilla.org/en-US/docs/Web/HTTP/CORS</a></p>
+
+<h4>Schema and Model</h4>
+<p>Populate the model file with the below:</p>
+<pre>
+<span>// models/article.js</span>
+
+const mongoose = require('mongoose');
+
+const articleSchema = new mongoose.Schema({ <span>               #1</span>
+  title: {
+    type: String,
+    required: [true, "Title is required"]
+  },
+  content: {
+    type: String,
+    required: [true, "Content can't be blank"]
+  }
+});
+
+module.exports = mongoose.model('Article', articleSchema); <span>#2</span>
+</pre>
+<ol>
+  <li>A database schema is it's structure. The mongoose schema is a prototype that maps to a MongoDB collection and defines the shape of the documents within that collection. Here we are creating an instance of mongoose.Schema that defines two fields with type set to String and making them required. Read about Mongoose Schema at <a href="https://mongoosejs.com/docs/guide.html">mongoosejs.com/docs/guide.html</a>.</li>
+  <li>
+    Models represent the data in an application. A mongoose model is a constructor function that creates and reads documents to and from the underlying MongoDB database. The first argument is the singular uppercase name of your database collection. So Article represents the articles MongoDB collection. The second argument is the schema which we defined above. An individual article is an instance of the Article model.
+  </li>
+</ol>
+
+<hr>
+<h2 id="routes">Routes</h2>
+<p>Now that we have our server, database and model set up, the last step for our simple API application is routing. Routing refers to determining how an application responds to a client request to a particular endpoint. An endpoint is a combined URI and HTTP request method (GET, POST, PATCH or PUT, DELETE) that activates specific actions from our API.</p>
+<p>We will apply database Create, Read, Update, and Delete (CRUD) actions to each endpoint. Meaning we will have an endpoint to return (Read) a JSON array of all our articles and another endpoint to return (Read) a JSON object for a specified article id. We will also have endpoints to Create, Update, and Delete articles. So our routes will be "RESTful" which essentially means our application routes and actions are build around performing these database CRUD actions.</p>
+<p>Populate the routes file:</p>
+<pre>
+<span>// routes/index.js</span>
+
+const express = require ('express'); 
+const router = express.Router(); <span>                 #1</span>
+const Article = require('../models/article'); <span>    #2</span>
+
+router.get('/articles', function(req, res) { <span>     #3</span>
+  Article.find(function(err, articles) {
+    res.json(articles);
+  });
+});
+
+router.get('/articles/:id', function(req, res) {  <span>#4</span>
+  Article.findById(req.params.id, function(err, article) {
+    if (!article) {
+      res.status(404).send('No result found');
+    } else {
+      res.json(article);
+    }
+  });
+});
+
+router.post('/articles', function(req, res) {     <span>#5</span>
+  let article = new Article(req.body);
+  article.save()
+    .then(article => {
+      res.send(article);
+    })
+    .catch(function(err) {
+      res.status(422).send('Article add failed');
+    });
+});
+
+router.patch('/articles/:id', function(req, res){    <span>#6</span>
+  Article.findByIdAndUpdate(req.params.id, req.body)
+    .then(function() {
+      res.json('Article updated');
+    })
+    .catch(function(err) {
+      res.status(422).send("Article update failed.");
+    });
+});
+
+router.delete('/articles/:id', function(req, res) {  <span>#7</span>
+  Article.findById(req.params.id, function(err, article) {
+    if (!article) {
+      res.status(404).send('Article not found');
+    } else {
+      Article.findByIdAndRemove(req.params.id)
+        .then(function() { res.status(200).json("Article deleted") })
+        .catch(function(err) {
+          res.status(400).send("Article delete failed.");
+        })
+    }
+  });
+})
+
+module.exports = router; <span>                            #8</span>
+</pre>
+<ol>
+  <li>Create an instance of the Express Router to be used as middleware for our routes.</li>
+  <li>Import the Article model.</li>
+<p class='my-1'>For each API endpoint we will chain a method to the router object. The format is: <br>
+<code>router.<i>HTTP Method</i>(<i>path</i>, <i>handler function</i>)</code> <br>
+We imported the Article model representing the articles collection in our database. We chain methods from the mongoose library to the Article prototype that will perform different types of CRUD actions. Our handler functions perform the CRUD operation and may return a response. Generally only return responses that will be used by the client.
+</p>
+  <li>Get request to /articles returns a JSON array of all article objects found in the database.</li>
+  <li>Get request to /articles/:id (:id is a variable representing an article's _id) returns a JSON object of the specified article if it exists, otherwise returns status 404 and "No result found"</li>
+  <li>Post request to /articles creates a new Article instance from the JSON object in sent in the HTTP request body and saves it to the database. If successful a status 200 code is automatically returned. We'll add on to that a JSON response with the new article object we just added which includes the article _id generated by the database.</li>
+  <li>Patch request to /articles/:id updates the specified article with the JSON object sent in the HTTP request body. You could use the PATCH, PUT or POST HTTP methods since they all send a payload. It's the handler function that determines what is done with the payload. On a successful update we are returning a JSON response just stating "Article updated". If the article did not update then we send an Unprocessable Entity code 422 response with a message.</li>
+  <li>Delete request to /articles/:id first checks if the article exists. If so it deletes it and sends status 200 with a JSON response of "Article deleted". </li>
+  <li>Export the router object with our Article endpoints.</li>
+</ol>
+
+<p>In the server.js file we imported our router object and then chained it to our Express app object. The first argument <code>'/api'</code> applies our router object when the '/api' path is called.</p>
+<pre>
+<span>// server.js</span>
+const router = require('./routes/index');
+...
+app.use('/api', router);
+</pre>
+
+<p>If you are familiar with the Model-View-Controller pattern (MVC) commonly used by web app frameworks, Express uses that pattern as well. Model we talked about. We are combining the controller actions directly with the routes rather than separating them into separate route and controller files. The view will be our React front end. Or you may say our view is the JSON responses returned when accessed by our front end React app. Let's see those in action.</p>
+
+<p class='mb-1'>With all the changes it's best to just restart your server:</p>
+<li class="dlr">CTRL+C</li>
+<li class="dlr"><code>nodemon</code></li>
+<p>Then in your browser go to the API articles endpoint: <br>http://localhost:3001/api/articles <br>
+And you should see an empty array. Congratulations! All that hard work paid off. An empty array. Now lets test all the endpoints using Curl and/or Postman.</p>
+
+<!-- API testing with Curl and Postman -->
+<hr class="space" id="curl">
+<h3>Test your API with Curl or Postman</h3>
+<h5>Curl</h5>
+<p>We're not done with our API until we know all the endpoints we created work. I'll discuss two ways we can do this. First is using Curl.</p>
+<p>Curl is a command line utility that lets you make HTTP requests from the Terminal instead of from a web page. Curl comes preloaded with Macs. For Windows you may need to install it, but it's a handy tool sometimes.  Let's make a POST request by entering the below Curl command. The -H option is for the header which is where we tell the receiver that the data we are sending is in JSON format. The -X option specifies the request method, POST in this case. The -d option is where we put our data, so you won't use the -d option with GET or DELETE requests. And of course we include the URL.</p>
+
+<li class="dlr"><code>nodemon</code> Make sure you start the server if it's not already running</li>
+<p class="dlr"><code>curl -H "Content-Type: application/json" -X POST -d '{"title":"Learn MERN","content":"Lorem Ipsum."}' http://localhost:3001/api/articles</code></p>
+<p>If it posted the server should send a response back with the new Article data in JSON format. It will have the title and content fields as you submitted, but it will also have an autogenerated _id field. If you go back to your browser localhost:3001/api/articles and refresh it, your empty array should now have one article in it.</p>
+<p>You can also make a Curl GET request with the new ID:</p>
+<p class="dlr"><code>curl -X GET http://localhost:3001/api/articles/<i>article._id</i></code> - inserting the _id.</p>
+<p>Now let's update this record with a PATCH request:</p>
+<p class="dlr margin"><code>curl -H "Content-Type: application/json" -X PATCH -d '{"title":"Learn the MERN Stack","content":"Lorem ipsum."}' http://localhost:3001/api/articles/<i>article_id</i></code></p>
+<p>It returns a JSON string of the saved updated article data. Now, let's delete it:</p>
+<p class="dlr"><code>curl -X DELETE http://localhost:3001/api/articles/<i>article._id</i></code></p>
+
+<hr class="space" id="postman">
+<h5>Postman</h5>
+
+<p>If you don't like the cryptic feel of sending HTTP requests from the command line, there is a popular free desktop application called Postman that lets you do the same thing from a GUI interface. You can download it from <a href="https://www.getpostman.com/downloads/">getpostman.com</a>. The tool is fairly intuitive but you will need to play around with it a bit to get comfortable with it. If you plan on building a lot of APIs Postman is an essential tool. Here are the CRUD actions hitting our API's endpoints:</p>
+<ul>
+  <li>Get Articles request: GET http://localhost:3001/api/articles</li>
+  <li>Get Article request: GET http://localhost:3001/api/articles/<i>article._id</i></li>
+  <li>Add Article request: POST http://localhost:3001/api/articles <br>
+    Headers: Content-Type application/json <br>
+    Body: {"title": "Learn Web Development", "content": "Lorem ipsum."}
+  </li>
+  <li>Update Article request: PATCH http://localhost:3001/api/articles/<i>article._id</i> <br>
+    Headers: Content-Type application/json <br>
+    Body: {"title": "Learn APIs", "content": "Blah Blah Blah."}
+  </li>
+  <li>Delete Article request: DELETE http://localhost:3001/api/articles/<i>article_id</i></li>
+</ul>
+<!-- <p>For POST and PATCH/PUT requests click on the body tab. You can enter the fields in JSON format, or select the x-www-form-urlencoded option and then you can enter each field as key value pairs.</p> -->
+
+<hr>
+<p>If everything works then our simple API is done! We can use this API as the back end for a mobile app, or to be accessed by other websites to display our fabulous articles. Or we could integrate it with a front end library like React to make a fully functioning web application. A so-called single-page-app (SPA). To do that last one, go on to part 2: <a href="mern_with_react_hooks">MERN APP: Integrate React</a>.</p>
+
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Rails React Heroku Tutorial</title>
+  <meta name="description" content="Tutorial on how to deploy a Ruby on Rails API with a React front end to Heroku"> 
+  <meta name="keywords" content="Rails API, React tutorial, React CRUD, Heroku">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Deploy Rails API with React to Heroku Tutorial</h1>
+  <p>Build and combine a Ruby on Rails API with a React front end and deploy to Heroku</p>
+  <p>By Steve Carey - 7/1/2019</p>
+  This Tutorial covers:
+  <ul>
+    <li><a href="#api-only">Create a Rails api-only application</a></li>
+    <li><a href="#react">Create the React front end</a></li>
+    <li><a href="#heroku">Deploy to Heroku</a></li>
+  </ul>
+  <p>Finished code: <a href="https://github.com/steve981cr/rails-react-heroku-app">Github</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<h2>Introduction</h2>
+
+<!-- react intro -->
+<p>This is part of a series of tutorials on APIs and the React library. See the full list at <a href="../tutorials">Tutorials</a>. Throughout this series we build a Create-Read-Update-Delete (CRUD) application with a React front end and a Ruby on Rails back end. Each section is self-contained.</p>
+
+<p>The <a href="rails_api">first tutorial</a> in this series showed you how to build a Rails Application Programming Interface (API). The <a href="react_crud_app">second tutorial</a> added the React front end. This section will show you how to deploy it to Heroku. We will build the whole app again with some changes for production.</p>
+
+<hr class="space" id="api-only">
+<h3>The Back End: Build a Ruby on Rails API-only Application</h3>
+<p>A Rails API-only app is a slimmed down version of a regular Rails web app, skipping the Asset Pipeline and generation of view and helper files. You can read the details in the <a href="https://guides.rubyonrails.org/api_app.html">Rails Guides - API App</a>.</p>
+<p>From the command line create a directory for your app, then generate a Rails app using the --api flag to make it API only.</p>
+
+<li class="dlr"><code>mkdir <i>appname</i>; cd <i>appname</i></code></li> 
+<li>If you are using RVM for Ruby and Gems version control you can set your gemset at this point.</li>
+<li class="dlr"><code>rails new . --api</code></li>
+<p class='mt-3'>In production we want to use the PostgreSQL database instead of the Rails default SQLite. For a real app we would want to use the same database for development, test and production. For a practice app like this, it's fine to use SQLite on our local environment. Move the sqlite3 gem into the development and test group. Then create a production group and add the pg gem.</p>
+<pre>
+# Gemfile
+group :development, :test do
+  gem 'sqlite3'
+  ...
+end
+group :production do
+  gem 'pg' 
+end
+</pre>
+<li class="dlr"><code>bundle install</code></li> 
+<p class='mt-3 mb-2'>Change the database.yml file to the below. For the Production section, replace "appname" with the name of your app.</p>
+<pre>
+# config/database.yml
+development:
+  adapter: sqlite3
+  pool: &lt;%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  timeout: 5000
+  database: db/development.sqlite3
+
+test:
+  adapter: sqlite3
+  pool: &lt;%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  timeout: 5000
+  database: db/test.sqlite3
+
+production:
+  adapter: postgresql
+  encoding: unicode
+  pool: &lt;%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  database: <i>appname</i>_production
+  username: <i>appname</i>
+  password: &lt;%= ENV['<i>APPNAME</i>_DATABASE_PASSWORD'] %>
+</pre>
+
+<p class='mt-3 mb-1'>Create an Article resource.</p>
+<li class="dlr"><code>rails generate scaffold Article title:string content:text</code></li>
+<li class="dlr"><code>rails db:migrate</code></li>
+<p class='mt-3 mb-2'>Add some seed data to db/seeds.rb</p>
+<pre>
+# db/seed.rb
+articles = Article.create([
+  {title: "Learn Ruby", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."},
+  {title: "Learn Rails", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."},
+  {title: "Learn React", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."}
+])
+</pre>
+<li class="dlr"><code>rails db:seed</code></li>
+<p class='mt-3'>Add a namespace to the api. We'll use "api" but it could be any name. Using a namespace avoids collisions between the rails routes and the react app's routes. Defining the namespace as a scope means it only affects the route and you don't need to add a namespace to the controller.</p>
+<pre>
+# config/routes.rb
+scope '/api' do
+  resources :articles
+end
+</pre>
+<li>Run the server. The API and the React front end need to run on different ports. For the API we'll use port 3001.</li>
+<li class="dlr"><code>rails server -p 3001</code></li>
+<li>View the JSON data at http://localhost:3001/api/articles</li>
+
+
+<hr class="space" id="react">
+<h2>Create the React app</h2>
+<p class="mb-0">We'll use the create-react-app npm package to build the React app within our Rails API project in a directory named "client". I'll skip the detailed explanations since they are already covered in the <a href="react_crud_app">React CRUD app tutorial</a>. From the Rails API project's root directory run:</p>
+<li class="dlr"><code>create-react-app client</code></li>
+<li class="dlr"><code>cd client</code></li>
+<p>This will add a directory named "client" and install the react app and all the npm packages inside it.</p>
+<p class="mb-0">Install the react-router-dom and axios packages:</p>
+<p class="dlr"><code>yarn add react-router-dom axios</code></p>
+
+<p class="mb-0">Run the React app. Adding the cwd option followed by the path from the current working directory allows you to run it without having to cd into the client folder. <br>
+<li class="dlr"><code>yarn start</code></li>
+<p>And this should open your browser to localhost:3000 and greet you with the Welcome to React web page including a spinning logo.</p>
+
+<h4>Connect the React App in the client directory to the Rails API</h4>
+<p>In the client/package.json file add a proxy property telling the React app to call port 3001.</p>
+<pre>
+# client/package.json
+{
+  "name": "client",
+  "version": "0.1.0",
+  "private": true,
+  <b>"proxy": "http://localhost:3001",</b>
+  ...
+}
+</pre>
+
+<h4>File Structure</h4>
+<p>Use UNIX commands to create the file structure. Make sure you are in the client directory. Note, we are moving the React favicon.ico to the images folder but in a real app you would of course put your own favicon image there.</p>
+<pre>
+mkdir public/images
+mv public/favicon.ico public/images/favicon.ico
+mkdir src/images
+mkdir src/stylesheets
+mkdir src/components
+mv src/logo.svg src/images/logo.svg
+mv src/index.css src/stylesheets/index.css
+mv src/App.css src/stylesheets/App.css
+mv src/App.js src/components/App.jsx
+mv src/App.test.js src/components/App.test.js
+touch src/components/Home.jsx
+touch src/components/ArticleList.jsx
+touch src/components/ArticleInfo.jsx
+touch src/components/ArticleAdd.jsx
+touch src/components/ArticleEdit.jsx
+</pre>
+
+<p>We temporarily broke our app. Fix the broken links and imports to get it working again:</p>
+<pre>
+# public/index.html 
+&lt;link rel="shortcut icon" href="%PUBLIC_URL%/images/favicon.ico">
+</pre>
+<pre>
+# src/index.js
+import './stylesheets/index.css';
+import App from './components/App';
+</pre>
+<pre>
+# src/components/App.jsx
+import logo from '../images/logo.svg';
+import '../stylesheets/App.css';
+</pre>
+<p>Save each file after you make the changes, then go check the browser. The app should be working again.</p>
+
+<h4>Stylesheets</h4>
+<p>Now let's make our own React content. Start by removing the css classes from App.css.</p>
+<pre>
+# src/stylesheets/App.css
+/* Remove all the CSS classes */
+</pre>
+<p>For convenience we'll use the Bootstrap CDN to style our app:</p>
+<pre>
+# client/src/stylesheets/index.css 
+@import url('https://stackpath.bootstrapcdn.com/bootstrap/4.1.2/css/bootstrap.min.css');
+</pre>
+
+<hr class="space">
+<h2>Create the React components</h2>
+<h4># public/index.html</h4>
+<p>This is a Single-Page Application (SPA) with CRUD capabilities and this is the single page. It is a standard HTML page with one element in the body. A div with id of "root" which is where all our React components will be displayed via JavaScript.</p>
+<h4># src/index.js</h4>
+<p>Then in the src/index.js file we import the React library and render our main component. Your src/index.js file should look like this.</p>
+<pre>
+import React from 'react';
+import ReactDOM from 'react-dom';
+import './stylesheets/index.css';
+import App from './components/App';
+import * as serviceWorker from './serviceWorker';
+
+ReactDOM.render(&lt;App />, document.getElementById('root'));
+serviceWorker.unregister();
+</pre>
+
+<h4># src/components/Home.jsx</h4>
+<p>Let's start out with a very simple component called Home. We already created an empty Home.jsx file. Populate it with the below:</p>
+<pre>
+import React from 'react';
+
+const Home = () => {
+  return (
+    &lt;div className="jumbotron">
+      &lt;h1>Home Page&lt;/h1>
+    &lt;/div>
+  );
+}
+
+export default Home;
+</pre>
+
+<hr class="space">
+<h4># src/components/App.jsx</h4>
+<p>The central component for our app is "App". That is what is returning the Welcome to React page we see in the browser. Replace that with a Navigation bar and a place to render the other components.</p>
+<pre>
+import React, { Component } from 'react';
+import '../stylesheets/App.css';
+import Home from './Home';
+import ArticleList from './ArticleList';
+import ArticleInfo from './ArticleInfo';
+import ArticleAdd from './ArticleAdd';
+import ArticleEdit from './ArticleEdit';
+import {BrowserRouter as Router, Route, NavLink, Switch} from 'react-router-dom'
+
+class App extends Component {
+  render() {
+    return (
+      &lt;div className="App">     
+        &lt;Router>
+          &lt;div className="container">
+            &lt;Navigation />
+            &lt;Main />
+          &lt;/div>
+        &lt;/Router>
+      &lt;/div>
+    );
+  }
+}
+
+const Navigation = () => (
+  &lt;nav className="navbar navbar-expand-lg navbar-dark bg-dark">
+    &lt;ul className="navbar-nav mr-auto">
+      &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/">Home&lt;/NavLink>&lt;/li>
+      &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/articles">Articles&lt;/NavLink>&lt;/li>
+    &lt;/ul>
+  &lt;/nav>
+);
+
+const Main = () => (
+  &lt;Switch>
+    &lt;Route exact path="/" component={Home} />
+    &lt;Route exact path="/articles" component={ArticleList} />
+    &lt;Route exact path="/articles/new" component={ArticleAdd} />
+    &lt;Route exact path="/articles/:id" component={ArticleInfo} />
+    &lt;Route exact path="/articles/:id/edit" component={ArticleEdit} />
+  &lt;/Switch>
+);
+
+export default App;
+</pre>
+<p>Once you add the code and save the file, go to the browser and make sure you didn't get any errors. You should see a navigation bar with two links, and a simple home page jumbotron. If you click on the articles link you'll get a blank page because we haven't populated that yet.</p> 
+
+<hr class="space">
+<h4># src/components/ArticleList.jsx</h4>
+<p>Populate the ArticleList component. This returns the equivalent of the Rails Articles index page. We call the API to retrieve a list of all the articles in the database. We set a proxy in the package.json file so we don't need to add the full URL in our API calls, just the path.</p>
+<pre>
+import React, { Component } from 'react';
+import { get } from 'axios';
+import { Link } from 'react-router-dom';
+
+class ArticleList extends Component {
+  constructor() {
+    super();
+    this.state = { articles: [] };
+  }
+
+  componentDidMount() {
+    get('/api/articles.json')
+      .then(response => { 
+        this.setState({articles: response.data});
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  render() {
+    return (
+      &lt;div>
+        {this.state.articles.map((article) => {
+          return(
+            &lt;div key={article.id}>
+              &lt;h2>&lt;Link to={`/articles/${article.id}`}>{article.title}&lt;/Link>&lt;/h2>
+              {article.content}
+              &lt;hr/>
+            &lt;/div>
+          )     
+        })}
+        &lt;Link to="/articles/new" className="btn btn-outline-primary">Create Article&lt;/Link>  
+      &lt;/div>
+    )
+  }
+}
+
+export default ArticleList;
+</pre>
+<p>Check to make sure it works. Make sure the server is running on port 3001.</p>
+<p class="dlr"><code>rails server -p 3001</code></p> 
+<p>In the browser on localhost:3000 if you click on the articles link you should see a list of articles. This corresponds with the JSON view at http://localhost:3001/api/articles.json which you can view in a separate browser tab.</p>
+
+<hr class="space">
+
+<!-- Foreman -->
+<h4 id='foreman'>Foreman <small>(Run the API and Client servers with one command)</small></h4>
+
+<p>Rather than changing into the client directory to start the React app, you can use the change-working-directory option to run it from the Rails product root directory like this: <code>yarn --cwd client start</code>. That still requires you to open two Terminal windows and start two separate servers. Instead, you can add the Foreman gem to run them both with one command. Foreman is a utility you call from the Terminal so you save it directly to your system, not though your Gemfile.</p>
+<li class='dlr'><code>gem install foreman</code></li>
+<p class="mt-3 mb-1">Then create a Procfile for your development environment and populate it with the below.</p>
+<li class="dlr"><code>touch Procfile.dev</code></li>
+<pre>
+# Procfile.dev
+web: cd client && PORT=3000 yarn start
+api: PORT=3001 && bundle exec rails s
+</pre>
+<p class='mt-3 mb-1'>By default Foreman looks for a file called Procfile to execute. The force option -f tells Foreman to use the provided file name instead. To start both servers run:</p>
+<li class="dlr"><code>foreman start -f Procfile.dev</code></li>
+
+<hr class="space">
+<h4># src/components/ArticleInfo.jsx</h4>
+<p>On to the ArticleInfo component which would correspond in Rails with the Articles show page. Populate the file with the below and save it.</p>
+<pre>
+import React, { Component } from 'react';
+import axios from 'axios';
+import { Link } from 'react-router-dom';
+
+class ArticleInfo extends Component {
+  constructor() {
+    super();
+    this.state = { article: {} };
+    this.handleDelete = this.handleDelete.bind(this);
+  }
+
+  componentDidMount() {
+    axios.get(`/api/articles/${this.props.match.params.id}.json`)
+      .then((response) => { 
+        this.setState({
+          article: response.data
+        })
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  handleDelete() {
+    axios.delete(`/api/articles/${this.props.match.params.id}.json`)
+      .then(() => {
+        this.props.history.push("/articles")
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  render() {
+    return (
+      &lt;div>
+        &lt;h2>{this.state.article.id}: {this.state.article.title}&lt;/h2>
+        &lt;p>{this.state.article.content}&lt;/p>
+        &lt;p>
+          &lt;Link to={`/articles/${this.state.article.id}/edit`} className="btn btn-outline-dark">Edit&lt;/Link> 
+          &lt;button onClick={this.handleDelete} className="btn btn-outline-dark">Delete&lt;/button> 
+          &lt;Link to="/articles" className="btn btn-outline-dark">Close&lt;/Link>
+        &lt;/p>
+        &lt;hr/>
+      &lt;/div>
+    )
+  }
+}
+
+export default ArticleInfo;
+</pre>
+<p>Now test it out in the browser. From the Articles page, if you click on an article title it should take you to the article page.</p>
+
+<hr class="space">
+<h4># src/components/ArticleAdd.jsx</h4>
+<p>ArticleAdd is the React equivalent of the Rails articles new page.</p>
+<pre>
+import React, { Component } from 'react';
+import { post } from 'axios';
+
+class ArticleAdd extends React.Component {
+  constructor() {
+    super();
+    this.state = { title: '', content: ''};
+    this.handleChange = this.handleChange.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this);
+    this.handleCancel = this.handleCancel.bind(this);
+  }
+
+  handleSubmit(event) {
+    event.preventDefault();
+    post('/api/articles.json', this.state)
+      .then((response) => {
+        this.props.history.push(`/articles/${response.data.id}`);
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  handleChange(event) {
+    this.setState({ [event.target.name]: event.target.value });
+  }
+  
+  handleCancel() {
+    this.props.history.push("/articles");
+  }
+
+  render() {
+    return (
+      &lt;div>
+        &lt;h1>Create Article Post&lt;/h1>
+        &lt;form onSubmit={this.handleSubmit}>
+          &lt;div className="form-group">
+            &lt;label>Title&lt;/label>
+            &lt;input type="text" name="title" value={this.state.title} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="form-group">
+            &lt;label>Content&lt;/label>
+            &lt;textarea name="content" rows="5" value={this.state.content} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="btn-group">
+            &lt;button type="submit" className="btn btn-dark">Create&lt;/button>
+            &lt;button type="button" onClick={this.handleCancel} className="btn btn-secondary">Cancel&lt;/button>
+          &lt;/div>
+        &lt;/form>
+      &lt;/div>
+    );
+  }
+}
+
+export default ArticleAdd;
+</pre>
+
+<hr class="space">
+<h4># src/components/ArticleEdit.jsx</h4>
+<p>ArticleEdit is the React version of Rails articles edit page.</p>
+<pre>
+import React from 'react';
+import { get, patch } from 'axios';
+
+class ArticleEdit extends React.Component {
+  constructor() {
+    super();
+    this.state = { title: '', content: ''};
+    this.handleChange = this.handleChange.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this);
+    this.handleCancel = this.handleCancel.bind(this);
+  }
+
+  componentDidMount() {
+    get(`/api/articles/${this.props.match.params.id}.json`)
+      .then((response) => {
+        this.setState(response.data);
+      })
+      .catch(error => console.log('error', error));      
+  }
+
+  handleSubmit(event) {
+    event.preventDefault();
+    patch(`/api/articles/${this.state.id}.json`, this.state)
+      .then(() => {
+        this.props.history.push(`/articles/${this.state.id}`);
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  handleChange(event) {
+    this.setState({ [event.target.name]: event.target.value });
+  }
+
+  handleCancel() {
+    this.props.history.push(`/articles/${this.state.id}`);
+  }
+
+  render() {
+    return (
+      &lt;div>
+        &lt;h1>Edit {this.state.title}&lt;/h1>
+        &lt;form onSubmit={this.handleSubmit}>
+          &lt;div className="form-group">
+            &lt;label>Title&lt;/label>
+            &lt;input type="text" name="title" value={this.state.title} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="form-group">
+            &lt;label>Content&lt;/label>
+            &lt;textarea name="content" rows="5" value={this.state.content} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="btn-group">
+            &lt;button type="submit" className="btn btn-dark">Update&lt;/button>
+            &lt;button type="button" onClick={this.handleCancel} className="btn btn-secondary">Cancel&lt;/button>
+          &lt;/div>
+        &lt;/form>
+      &lt;/div>
+    );
+  }
+}
+
+export default ArticleEdit;
+</pre>
+<p>Save it and test it out. We are now done with our React components and we have a functionining CRUD application, at least in our development environment.</p>
+
+<hr class="space" id="heroku">
+<h2>Deploy to Heroku</h2>
+<h4>Add package.json to the Rails project's root directory</h4>
+<p>Add a package.json file to the root of your project. <code>yarn init</code> or <code>npm init</code> will create a basic one and ask you a series of questions for populating it. Adding the --yes flag will use the default answers which is fine for our purposes.</p>
+<li class="dlr"><code>yarn init -y</code></li>
+<p>So now we have a package.json file in our client directory for React and in the root directory of our Rails app. Open the latter that we just created and add engines and scripts properties.</p>
+<pre>
+# package.json
+{
+  "name": "<i>appname</i>",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "<i>your_name</i>",
+  "license": "MIT",
+  <b>"engines": {                          <span>#1</span>
+    "node": "10.16.0",
+    "yarn": "1.16.0"
+  },
+  "scripts": {                          <span>#2</span>
+    "build": "yarn --cwd client install && yarn --cwd client build",
+    "deploy": "cp -a client/build/. public/",
+    "heroku-postbuild": "yarn build && yarn deploy"
+  }</b>
+}
+</pre>
+<ol>
+  <b></b>
+  <li>Engines: <br>
+    Get the latest node and yarn versions. Running <code>npm show <i>package-name</i> version</code> will return the latest package versions. But for node you might want to use the more conservative LTS version which you can get from <a href="https://nodejs.org">nodejs.org</a>.</li>
+  <b></b>
+  <li>Run Scripts: <br>
+    We need to tell Heroku to install the React packages in the client folder and call the build command to build the React app. <br>
+  The deploy command will move the React app to the public folder of your Rails app.<br>
+  The heroku-postbuild command will run the build and deploy scripts above after </li>
+</ol>
+
+<h4>Procfile</h4>
+<p>Heroku uses the Foreman gem which by default will look for a file named "Procfile". We can put some instructions to use the puma server (or a different server if you prefer) and what port to run on.</p>
+<li class="dlr"><code>touch Procfile</code></li>
+<pre>
+# Procfile
+web: bundle exec puma -t 5:5 -p ${PORT:-3001} -e ${RACK_ENV:-development}
+</pre>
+
+<h4>Deploy your app to Heroku</h4>
+<p>This tutorial assumes you are already familiar with Heroku. If not, you need to first create an account on Heroku: <a href="https://www.heroku.com">heroku.com</a><br>
+Then download and install the Heroku Command Line Interface on your computer <a href="https://devcenter.heroku.com/articles/heroku-cli">devcenter.heroku.com/articles/heroku-cli</a>.</p>
+<p class='mb-0'>From the CLI, create a new Heroku App:</p>
+<li class="dlr"><code>heroku create <i>appname</i></code></li>
+<p>If your appname is already taken you'll have to pick another one. Or leave off the appname and let Heroku generate a super awesome one for you. If you have a real domain name you can configure Heroku to use that <a href="https://devcenter.heroku.com/articles/custom-domains">devcenter.heroku.com/articles/custom-domains</a></p>
+<p class='mb-0'>Check that your app is connected to Heroku. The below command will list the project's remote git repositories (if any) and their urls. Rails automatically initiates a git repository when you create an app (so you don't need to run <code>git init</code>)</p>
+<li class="dlr"><code>git remote -v</code></li>
+
+<p class='mt-3 mb-0'>Tell Heroku to execute the Node.js buildpack before the Ruby buildpack. So in the CLI run:</p>
+<li class="dlr"><code>heroku buildpacks:add heroku/nodejs --index 1</code></li>
+<li class="dlr"><code>heroku buildpacks:add heroku/ruby --index 2</code></li>
+
+<p class='mt-3 mb-0'>Commit all your changes to git then push the app to Heroku:</p>
+<li class="dlr"><code>git add .</code></li>
+<li class="dlr"><code>git commit -m "initial commit"</code></li>
+<li class="dlr"><code>git push heroku master</code></li>
+
+<p class='mt-3 mb-0'>Run the database migrations then seed the database. Heroku automatically adds the Heroku Postgres addon for you.</p>
+<li class="dlr"><code>heroku run rake db:migrate</code></li>
+<li class="dlr"><code>heroku run rake db:seed</code></li>
+
+<p class='mt-3 mb-0'>Assuming you got no errors in the above processes, you can run:</p>
+<li class="dlr"><code>heroku open</code></li>
+<p>The app will open to https://<i>appname</i>.herokuapp.com. <br>
+To see the API JSON data go to https://<i>appname</i>.herokuapp.com/api/articles 
+</p>
+
+</div>
+</body>
+</html>

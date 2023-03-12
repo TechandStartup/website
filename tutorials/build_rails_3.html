@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Build your own Ruby on Rails Tutorial</title>
+  <meta name="description" content="Learn Ruby and Rails by building your own simple web framework. Tutorial"> 
+  <meta name="keywords" content="Ruby on Rails, Web Framework Tutorial">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Routes <small style="padding-left: 25px;">Build Your Own Rails - Part 3</small></h1>
+  <p>Learn Ruby and Rails by building your own very simplistic Rails-like Framework.</p>
+  <p><a href="build_rails_2">Back to Part 2</a> | <a href="build_rails_4">On to Part 4</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<!-- See Mini-rails-apps/mini-rails1 for how to do a block. I applied it to gems-mine/routes-app -->
+<!-- See brailsfolders/brailsfolder/jails for tons of notes in the code itself. -->
+<!-- See jailsfolder/jailsapp/docs/routes.rb for lots of notes and instructions on routes -->
+<p>In the simple rackapp we used a case statement to allow for different actions based on the URL path. In this section we'll create a Routing class to match a request url path to a controller and action. Before we get into the code we'll start with a quick overview of a URL and how it's used in a Web application.</p><br>
+
+<h3>URL format</h3>
+<p>Let's start with the difference between a URL and an URI since you often see those terms used seemingly interchangeably. <br>
+<b>URL (Uniform Resource Locator):</b> is a web address. It specifies the location of web resource on a computer network, most commonly on the World Wide Web. URLs can reference web pages (http), but are also used for file transfer (ftp), email (mailto), and others. <br>
+<b>URI (Uniform Resource Identifier):</b> Is a string of characters used to identify a resource, but it doesn't necessarily tell you how to locate the resource. URLs are URIs for locating web addresses. Because URI is more inclusive than URL and can encompass the corner cases, URI is often considered a more correct term to use in technical literature. For our tutorial, both terms are correct. </p>
+<p>
+
+<pre>
+<b>Format:</b>  scheme://host[:port][/]path[?query][#fragment]
+<b>Example:</b> http://www.example.com/articles/21?title=Ruby#summary
+</pre>
+<b>Scheme or protocol - (http):</b> http, https, ftp, mailto, file, data, etc. followed by ://<br>
+<b>Host - (www.example.com):</b> an ip address or a registered name  that has an assigned ip address. Host is comprised of the host name or subdomain (www), the domain name (example), and the top level domain (.com). The host is what the internet uses to find the website server.<br>
+<b>Path - (/articles/21):</b> This is what we will be focusing on in this section. It's the path that that gets matched to a controller and action. <br>
+<b>Route Params:</b> Rails and many Web frameworks treat specified parts of the path as params. Specifically a path like /articles/21 will assign the number 21 to params[:id] = 21. This is not done by HTTP nor by Rack. Rather, this conversion done by the framework code itself which will also do.<br>
+<b>Query string - (?title=Ruby):</b> Begins with ? and generally contains a sequence of attribute-value pairs separated by a delimiter. Forms that use GET rather than POST transmit data using query strings. That's a bad idea for anything going into a database, but for search forms it's ideal since the user can see their search term in the URL and can save it for future reference. Rack treats query strings as params, just like form data submitted with a POST request.<br>
+<b>Fragment - (#summary):</b> begins with #. Used to take you to an element id on the page like &lt;div id="summary">.
+</p>
+
+<hr class="space">
+<h3>Call Routing</h3>
+<p>Okay, let's build. In the call method we'll instantiate a new Routing object and chain the <i>dispatch</i> method to it. This will ultimately return a Rack response object which will get sent back to the client. Change the call method to the below:</p>
+<pre>
+<b># lib/jails.rb</b>
+...
+module Jails
+  class Application
+    # Instantiate a Request object, instantiate Routing object and call dispatch method, ultimately return response.
+    def call(env)
+      request = Rack::Request.new(env)
+      puts("\n\nStarted #{request.request_method} \"#{request.path}\" for #{request.ip} #{Time.now}")
+      response = Routing.new(request).dispatch
+      return response
+    end
+  end
+end
+</pre>
+<p>Let's breaks this down by statement line. <br>
+1) Create a request object and assign it to a local variable <i>request</i>. <br>
+2) We'll start doing some logging using the puts method. Puts will print out the argument to the terminal screen that is running our app server. This is the first log message that will be printed after our server receives an HTTP request. The two <i>\n</i> are backslash notations to create two new lines before our initial log message. We will log information from the request object including the request method (e.g., GET, POST), the path (e.g., /about), and the requester's ip address. Time is a Ruby core class. Time.now returns the current date and time. <br>
+3-4) Instantiate a Routing object, passing in the request object as the argument, and immediately call the dispatch method on the new object. This will ultimately return a Rack Response object.
+</p>
+
+<hr class="space">
+<h3>Define the App's Routes</h3>
+<p>Of course the Routing class and the dispatch method don't exist yet. We'll create that shortly, but first let's go to the app's routes.rb file. That's where we define the actual route paths and their corresponding controllers and actions for our Blog application. This file is part of the application, as opposed to the Jails framework library, and will be called by the Jails Routing class. We'll define a class method called routes, which will return a proc object with all the routes in a block of code. We'll explain what this means shortly.</p>
+<pre>
+<b># config/routes.rb</b>
+class Application
+  def self.routes
+    Proc.new do
+      match("/", "pages#home")
+      match("/about", "pages#about")
+      match("/user", "pages#user")
+      match("/pages/:id", "pages#show")
+      match("/jogin", "pages#jogin")
+      match("/jogout", "pages#jogout")
+    end
+  end
+end
+</pre>
+
+<hr class="space">
+<h3>Create the Framework's Routing Class</h3>
+<p>Now populate the Jails library's routing.rb file with the Routing class.</p>
+<pre>
+<b># lib/jails/routing.rb</b>
+class Routing
+
+  # Set request object as an attribute. Declare a routes attribute. Call the draw method to populate it with a hash of routes.
+  def initialize(request)
+    @request = request
+    @routes = {} 
+    draw(Application.routes)
+  end
+
+  # Build the @routes hash by evaluating the block passed in as a proc object from the Application.routes method.
+  def draw(block)   
+    instance_eval(&block)
+  end
+
+  # Add route to @routes hash with the url's path as the key and target as the value.
+  def match(path, target)
+    @routes["#{path}"] = target
+  end
+
+  # Match request path to @routes hash. If match, create controller object and call the action.
+  def dispatch
+    path = @request.path
+    id = nil
+    segments = path.split("/").reject { |segment| segment.empty? }
+    if segments[1] =~ /^\d+$/
+      id = segments[1]
+      segments[1] = ":id"
+      path = "/#{segments.join('/')}"
+    end
+    if @routes.key?(path)
+      target = @routes[path]
+      resource_name, action_name = target.split('#')
+      @request.params.merge!(resource: resource_name, action: action_name, id: id)
+      klass = Object.const_get("#{resource_name.capitalize}Controller")
+      puts("Processing by #{klass}##{action_name}")
+      klass.new(@request).send(action_name)
+    else
+      Rack::Response.new(["Nothing found"], 404, {"Content-Type" => "text/html"})
+    end
+  rescue StandardError => error
+    puts error.message
+    puts error.backtrace
+    Rack::Response.new(["Internal error"], 500, {"Content-Type" => "text/html"})
+  end
+end
+</pre>
+<p>Let's break this down method by method.</p>
+<pre>
+def initialize(request)
+  @request = request        # 1
+  @routes = {}              # 2
+  draw(Application.routes)  # 3
+end
+</pre>
+<p>When a request is made which calls the "call" method, we instantiate a new Routing object and call the dispatch method on it: <code>Routing.new(request).dispatch</code>. Objects are created from classes before they are used. Calling the new method on a class creates a new object. The new method calls the (optional) initialize method automatically. In the initialize method we put in code that will add attributes to our object and call any methods we want run when the object is created. Initialize method statements:<br>
+1) In the first statement we declare the @request instance variable, assigning it to the request object that was passed in as a parameter. Assigning an instance variable in the initialize method will make it an attribute of the new Routing object. <br><!-- Class methods are public by default meaning they can be accessed from outside the class. The initialize method, however, is private. -->
+<!-- We also made a getter method out of <i>request</i> by adding it as an argument to the attr_reader method at the top of the class.<br> -->
+2) Declare a @routes instance variable and assign it to an empty hash. The next statement will populate that hash with the app's routes and their corresponding controller name and action. Later, the @routes collection will be compared to the actual url path from a request.<br>
+<!-- We also made a getter and setter method out of <i>routes</i> by adding it as an argument to the attr_accesor method at the top of the class. <br> -->
+3) We want to populate @routes with the actual routes and controller and actions of the application. So we'll define a draw method and call it, passing in a method, <i>Application.routes</i>, as the argument. We defined that method in the app's config/routes.rb file. When called, it returns a proc object that contains a block with statements for all the app's routes.</p>
+<p>Let's jump back to the application routes file.</p>
+<pre>
+<b># config/routes.rb - Application class</b>
+def self.routes                                                                                                       
+  Proc.new do                                                                                                         
+    match("/", "pages#home")
+    match("/about", "pages#about")
+    ...
+  end                                                                                                                 
+end  
+</pre>
+<p>Proc (rhymes with block) is short for procedure and is a Ruby core class. A proc is similar to a method in that it holds a block of code. But a method is not an object and a proc is. As an object a proc can be assigned to a variable, or passed as an argument in a method. Our <i>routes</i> class method instantiates a proc object with a block of code containing our application's routes and controller#actions. <!-- It can be stored in a variable, and when you run the proc the result is assigned to the variable.  --> So, when we call the routes method it returns the block of routes as a proc object. Now back to our framework's Routing methods.</p>
+<pre>
+def draw(block)   
+  instance_eval(&block)
+end
+def match(path, target)
+  @routes["#{path}"] = target
+end
+</pre>
+<p>We called the draw method from intialize so it is called every time a new routing object is created. It passes in a block of routes packaged as a proc as it's argument. To run the block of code in the proc, we call the instance_eval method. In the application's routes method, each route path and it's corresponding controller and action separated by # are arguments to the <i>match</i> method. <i>Match</i> adds the route to the @routes hash with the url as the key and target as the value. When the whole block is finished being evaluated, it will have put all the routes into the @routes hash.</p>
+<pre>
+def dispatch
+  path = @request.path              # 1
+  id = nil                          # 2
+  segments = path.split("/").reject { |segment| segment.empty? }
+  if segments[1] =~ /^\d+$/
+    id = segments[1]
+    segments[1] = ":id"
+    path = "/#{segments.join('/')}"
+  end
+  if @routes.key?(path)              # 9
+    target = @routes[path]
+    resource_name, action_name = target.split('#')
+    @request.params.merge!(resource: resource_name, action: action_name, id: id)
+    klass = Object.const_get("#{resource_name.capitalize}Controller")           # 13
+    puts("Processing by #{klass}##{action_name}")                               # 14
+    klass.new(@request).send(action_name)                                       # 15
+  else                                                                          # 16
+    Rack::Response.new(["Nothing found"], 404, {"Content-Type" => "text/html"})
+  end
+rescue StandardError => error                                                   # 19
+  puts("-"*100)
+  puts("#{error.class.name}: #{error.message}")
+  puts("Exception source stack displays filename, line number, and method the exception is in:")
+  puts(error.backtrace)
+  puts("-"*100)
+  Rack::Response.new(["Internal error"], 500, {"Content-Type" => "text/html"})
+end
+</pre>
+The dispatch method will call the controller action that is mapped to the url path or return an error message. <br>
+1) The first statement just assigns the request.path value to a local variable <i>path</i>. <br>
+2-8) The next seven lines are checking if the route has an id. Routes to a specific resource instance such as a "Learn Rack" article, will have it's id number in the route. This is called a route parameter. Start by declaring local variable <i>id</i> by assigning it to nil. The variable needs to exist even if it's value is nil. We then break the path into an array of path segments. The split method transforms the string into an array split by the argument, in this case the forward slashes /. The first element will be an empty segment before the first slash, then the resource name (e.g., articles), and then maybe an id number. We discard the empty segment with the reject method. Then use a regular expression (regexp) to check if the remaining second segment, segments[1], is a number. If it is, we assign it to the <i>id</i> variable, replace it with the string <i>":id"</i> and put the path back together as a single string using the join method. <br>
+9-12) The next block of code is an if statement that checks if any of the @routes hash keys match the request's url path. If so we get the target controller#action from the @routes hash, then split it into separate variables: resource_name and action_name. Then we add these to the @request params hash using the merge! method, also adding the id. <br>
+13) Instantiate a new object called <i>Resource</i>Controller, with Resource being the value of of the resource_name variable. Capitalize it. So, for example the articles resource gives us a new object called ArticlesController. We assign it to a variable called <i>klass</i>. Since <i>class</i> is a Ruby keyword, and this variable represents the name of the class, we'll just call our variable <i>klass</i>. <br>
+14) Print a log message to the terminal displaying the class#action.<br>
+15) Finally, instantiate a new ArticlesController object, passing in the request object as the parameter, and calling the action method on it. The send method will call an instance method on a class. The class is the receiver and the method is the argument to the send method.<br>
+16-18) Return a response with code 404 and body "Nothing Found" if there is no match of the url path to the routes.<br>
+19-25) If there is an error in our code we can return response code 500 and body "Internal Error". And log information to help with debugging using the error's class name, message and backtrace methods. Ruby creates an exception object which we can access with keyword <i>rescue</i> followed by the exception class, hash rocket =>, and a variable name to assign the object to. Like <code>rescue StandardError => error</code>. StandardError encompasses exceptions with your code. You can get more specific with the multiple StandardError subclasses. By deliberately putting a typo in your code, then refreshing your the browser, you can see the Exception output.
+</p>
+
+<hr class="space">
+<h3>Temporary Controller</h3>
+<p>Let's test it out. The dispatch method calls the controller and action for the url's path. We created routes for a pages controller. It's actually not even a full resource, just a controller with some actions. We created the pages_controller file in the last section. For now populate it with this:</p>
+<pre>
+<b># app/controllers/pages_controller.rb</b>
+class PagesController
+  def initialize(request)
+    @request = request    
+  end
+
+  def home
+    response
+  end
+
+  def about
+    response
+  end
+
+  def user
+    response
+  end
+
+  def show
+    response
+  end
+
+  private
+    def response
+      Rack::Response.new(["&lt;b>Path&lt;/b>: #{@request.path} | 
+          &lt;b>Resource&lt;/b>: #{@request.params[:resource]} | 
+          &lt;b>Action&lt;/b>: #{@request.params[:action]} | 
+          &lt;b>id&lt;/b>: #{@request.params[:id] || 'nil'}"], 
+        200, 
+        {"Content-Type" => "text/html"})
+    end
+end
+</pre>
+<p>We define a PagesController class. Add an initialize method so we can make the request object an attribute accessible with an instance variable. The initialize method is automatically called every time a new PagesController object is instantiated.</p>
+<p>We also add the relevant actions. Actions are a methods that have corresponding routes. Each action will call a private method called response. <br> The response method returns a Rack response with the request object properties of path, and the params that we added on for resource, action, and id. If <i>id</i> does not have a value we'll return the string "nil." Private methods follow the <i>private</i> keyword and are only accessible within the class (or subclass). </p>
+<p>Now test it out. Because of our Rack Reloader middleware, you shouldn't have to restart the server. Go to your browser and enter the following URLs:</p>
+<pre>
+http://localhost:9292
+http://localhost:9292/about
+http://localhost:9292/user
+http://localhost:9292/pages/3
+http://localhost:9292/pages/264232134
+http://localhost:9292/badlink
+</pre>
+<p>For each url you should see the path, resource, action, and id displayed in your browser. Notice any numbers in the path after /pages/ are assigned to the id params. The last url should return "Nothing Found" and status code 404.</p> 
+<p>That concludes the Routing section. Next we'll create our controllers and views.</p>
+<hr>
+<p><a href="build_rails_4">On to Part 4 - Controllers and Views</a></p>
+</div>
+</div>
+</body>
+</html>

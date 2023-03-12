@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Build a GraphQL API with Node.js and Apollo-Server Tutorial</title>
+  <meta name="description" content="Part 1 of a 2 part series on building a GraphQL Node.js API and React front end incorporating all four CRUD actions (Create-Read-Update-Delete)."> 
+  <meta name="keywords" content="GraphQL, Apollo, Apollo-Server, Node.js, Express, MongoDB, React, CRUD app, tutorial">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h2>Build a GraphQL API with Node.js and Apollo-Server Tutorial</h2>
+  <p>Part 1 of a 2 part series on building a GraphQL MERN Stack (MongoDB-Express-React-Node) with Apollo that performs all four CRUD operations (Create-Read-Update-Delete).</p>
+  <p>By Steve Carey - 8/11/2019</p>
+  <p>Part 2: <a href="react_app_with_graphql">Build a React app with GraphQL Tutorial</a></p>
+  <p>Finished code: <a href="https://github.com/steve981cr/mern-with-graphql-and-apollo-server">Github</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<h2 id='overview'>Overview</h2>
+<p>The emphasis of this tutorial is on how to use GraphQL to execute all four CRUD actions in the context of a Node.js with MongoDB API. The second part builds a React client for our API. You can do Part 1 without doing Part 2.</p> 
+<p>You should be able to build the API even if you are new to Node.js and to GraphQL. You do, however, need to be comfortable using the command line, and have Node.js installed.</p>
+<h4>GraphQL</h4> 
+<p>GraphQL is a query and manipulation language for APIs and a runtime for fulfilling those queries with your existing data. GraphQL was developed internally by Facebook in 2012. It was released publicly in 2015, and in 2018 was spun off into the GraphQL Foundation, hosted by the non-profit Linux Foundation.</p>
+<p>The standard architecture on the web for interacting with a database is called REST (Representational State Transfer). It has separate HTTP method and URL combinations (called endpoints) for each CRUD action you want to perform. For example, to get a list of articles you would make an HTTP GET request to example.com/articles. To post an article you would make an HTTP POST request to example.com/articles. To delete an article you would make a DELETE request to example.com/articles/:id, and so on.</p> 
+<p>GraphQL has only one endpoint, a POST request to your domain. In your API you set up responses to specific named queries and mutations that you expect to receive. Queries are readrequests (GET)  while Mutations are write requests (POST, PUT or PATCH, and DELETE). The advantage to using GraphQL is the client can request exactly what they need in one request, which the API can then process as one request. If your app displays a lot of different data on one page the advantage of this architecture becomes obvious. For a simple app though, GraphQL would be overkill, so REST will still have its place.</p>
+<h4>Apollo</h4>
+<p>Apollo is a software company that provides a number of tools and services around the GraphQL query language. On the client side Apollo has some very useful features for React that work with Angular and Vue as well.</p>
+<p>For a GraphQL API you need to install the graphql npm package to process query and mutation requests. GraphQL is database agnostic meaning you can use whatever database you prefer. You still use the same ORM to make the database queries, in our case we will be using Mongoose.js with a MongoDB database.</p>
+<p>To use GraphQL in a Node app you need a GraphQL HTTP Server. There are two popular npm packages that provide one: apollo-server and express-graphql. </p>
+<p>Which is better? Well, they both get the job done. And for the simple app we are going to build either will work just as well and the code is pretty similar. Down the line Apollo Server does have some features that make it a good option. It allows you to cache data on the server side. It also has good error messaging capabilities. In this tutorial we will use Apollo-server.</p>
+<p>The other option, Express-graphql, was created by Facebook and is now maintained by the GraphQL Foundation. In terms of npm downloads, it is roughly equal to apollo-server (including apollo-server-express). To see an alternate version of this tutorial using express-graphql go to: <a href="graphql_api_with_express">Build a GraphQL API with Node, Express, and MongoDB Tutorial</a></p>
+
+<p>A note on syntax. Node recognizes most, but not all, ES6 syntax. Notably it does not recognize import/export statements, so we won't use them here. While we won't do it in this tutorial, you have the option of installing Babel which will transpile ES6 to ES5 for you at run time.</p>
+
+<hr>
+<h2 id='setup'>Project Setup</h2>
+<p class='mb-1'>Create a directory for your project and cd into it. We'll call it graphql-node-apollo-server-and-react. I know that's a lot of typing so use a shorter name if you like.</p>
+<li class="dlr"><code>mkdir graphql-node-apollo-server-and-react && cd graphql-node-apollo-server-and-react</code></li>
+<p class='mt-3 mb-1'>Create the files for our API. You can use these UNIX commands from the command line, or do it in your text editor. Mkdir creates a directory and touch creates a file.</p>
+<pre>
+touch server.js
+mkdir models
+touch models/article.js
+mkdir graphql
+touch graphql/typeDefs.js
+touch graphql/resolvers.js
+</pre>
+
+<hr>
+<h4>Package.json</h4>
+<p class='mb-1'>Generate a <a href="https://docs.npmjs.com/files/package.json">package.json file</a>. This file contains the metadata for a Node.js project. Adding the --yes flag (-y for short) will use the defaults for the fields.</p>
+<li class="dlr"><code>npm init -y</code></li>
+<p class='mt-3 mb-1'>Install our npm packages. First the global packages. These get installed on your system and not attached to any specific project. The Nodemon package will allow you to do hot reloading of the app, which means it will restart the server every time you make a change and save it in your project. The --global or -g flag makes it global. If you already have it installed this will upgrade it to the latest version.</p>
+<li class="dlr"><code>npm install -g nodemon</code></li>
+<p class='mt-3 mb-1'>Local packages will be installed directly in your project in the node_modules folder. Install the following packages: </p>
+<li class="dlr"><code>npm install mongoose graphql apollo-server</code></li>
+<ul>
+  <li>Mongoose is middleware for connecting to the MongoDB database in an object oriented manner.</li>
+  <li>Graphql (the npm package) is the JavaScript implementation of GraphQL.</li>
+  <li>Apollo-server creates a GraphQL HTTP server.</li>
+</ul>
+
+<p>Your package.json file should look something like the below. A list of the project's installed packages with version and their dendencies is saved under dependencies. If you run <code>npm install</code> then npm would attempt to install or update the packages listed there.</p>
+<p>Make sure the "main" property's value is "server.js". Change it if it isn't.</p>
+<p>Also make sure you have the "start" script. Add it if you don't. You can run the commands in the scripts object from the command line with <code>npm run <i>script-name</i></code>. I'll explain more in the next section.</p>
+<div class="filename">package.json</div>
+<div class="highlight"><pre><span></span><span class="lineno"> 1 </span><span class="p">{</span>
+<span class="lineno"> 2 </span>  <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;graphql-node-apollo-server-and-react&quot;</span><span class="p">,</span>
+<span class="lineno"> 3 </span>  <span class="nt">&quot;version&quot;</span><span class="p">:</span> <span class="s2">&quot;1.0.0&quot;</span><span class="p">,</span>
+<span class="lineno"> 4 </span>  <span class="nt">&quot;description&quot;</span><span class="p">:</span> <span class="s2">&quot;GraphQL API built with Node.js, Apollo-Server, MongoDB, and React&quot;</span><span class="p">,</span>
+<span class="lineno"> 5 </span>  <span class='callout'><span class="nt">&quot;main&quot;</span><span class="p">:</span> <span class="s2">&quot;server.js&quot;</span><span class="p">,</span></span>
+<span class="lineno"> 6 </span>  <span class="nt">&quot;scripts&quot;</span><span class="p">:</span> <span class="p">{</span>
+<span class="lineno"> 7 </span>    <span class="nt">&quot;test&quot;</span><span class="p">:</span> <span class="s2">&quot;echo \&quot;Error: no test specified\&quot; &amp;&amp; exit 1&quot;</span><span class="p">,</span>
+<span class="lineno"> 8 </span>    <span class="callout"><span class="nt">&quot;start&quot;</span><span class="p">:</span> <span class="s2">&quot;node server.js&quot;</span><span class="p"></span></span>
+<span class="lineno">10 </span>  <span class="p">},</span>
+<span class="lineno">11 </span>  <span class="nt">&quot;keywords&quot;</span><span class="p">:</span> <span class="p">[],</span>
+<span class="lineno">12 </span>  <span class="nt">&quot;author&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="lineno">13 </span>  <span class="nt">&quot;license&quot;</span><span class="p">:</span> <span class="s2">&quot;ISC&quot;</span><span class="p">,</span>
+<span class="lineno">14 </span>  <span class="nt">&quot;dependencies&quot;</span><span class="p">:</span> <span class="p">{</span>
+<span class="lineno">15 </span>    <span class="nt">&quot;apollo-server&quot;</span><span class="p">:</span> <span class="s2">&quot;^2.8.1&quot;</span><span class="p">,</span>
+<span class="lineno">16 </span>    <span class="nt">&quot;graphql&quot;</span><span class="p">:</span> <span class="s2">&quot;^14.4.2&quot;</span><span class="p">,</span>
+<span class="lineno">17 </span>    <span class="nt">&quot;mongoose&quot;</span><span class="p">:</span> <span class="s2">&quot;^5.6.6&quot;</span>
+<span class="lineno">18 </span>  <span class="p">}</span>
+<span class="lineno">22 </span><span class="p">}</span>
+</pre></div>
+
+<p>You will also see a file named package-lock.json. That lists all the project's installed packages with their versions and their dendencies.</p>
+
+<hr>
+<h2 id="server">Hello World</h2>
+<p>Following the ancient traditions of my people we will start things off with a Hello World app powered by Apollo-Server. Actually this is the same Hello World app from the <a href="https://www.apollographql.com/docs/apollo-server/essentials/server/">Apollo-Server docs</a>. We'll use it as our starting point.</p>
+<div class="filename">server.js</div>
+<div class="highlight"><pre><span></span><span class="lineno"> 1 </span><span class="kr">const</span> <span class="p">{</span> <span class="nx">ApolloServer</span><span class="p">,</span> <span class="nx">gql</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;apollo-server&#39;</span><span class="p">);</span>
+<span class="lineno"> 2 </span>
+<span class="lineno"> 3 </span><span class="kr">const</span> <span class="nx">PORT</span> <span class="o">=</span> <span class="mi">4000</span><span class="p">;</span>
+<span class="lineno"> 4 </span>
+<span class="lineno"> 5 </span><span class="c1">// The GraphQL schema</span>
+<span class="lineno"> 6 </span><span class="kr">const</span> <span class="nx">typeDefs</span> <span class="o">=</span> <span class="nx">gql</span><span class="sb">`</span>
+<span class="lineno"> 7 </span><span class="sb">  type Query {</span>
+<span class="lineno"> 8 </span><span class="sb">    hello: String</span>
+<span class="lineno"> 9 </span><span class="sb">  }</span>
+<span class="lineno">10 </span><span class="sb">`</span><span class="p">;</span>
+<span class="lineno">11 </span>
+<span class="lineno">12 </span><span class="c1">// A map of functions which return data for the schema.</span>
+<span class="lineno">13 </span><span class="kr">const</span> <span class="nx">resolvers</span> <span class="o">=</span> <span class="p">{</span>
+<span class="lineno">14 </span>  <span class="nx">Query</span><span class="o">:</span> <span class="p">{</span>
+<span class="lineno">15 </span>    <span class="nx">hello</span><span class="o">:</span> <span class="kd">function</span><span class="p">()</span> <span class="p">{</span> <span class="k">return</span> <span class="s1">&#39;world&#39;</span> <span class="p">}</span>
+<span class="lineno">16 </span>  <span class="p">}</span>
+<span class="lineno">17 </span><span class="p">};</span>
+<span class="lineno">18 </span>
+<span class="lineno">19 </span><span class="kr">const</span> <span class="nx">server</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">ApolloServer</span><span class="p">({</span>
+<span class="lineno">20 </span>  <span class="nx">typeDefs</span><span class="p">,</span>
+<span class="lineno">21 </span>  <span class="nx">resolvers</span><span class="p">,</span>
+<span class="lineno">22 </span><span class="p">});</span>
+<span class="lineno">23 </span>
+<span class="lineno">24 </span><span class="nx">server</span><span class="p">.</span><span class="nx">listen</span><span class="p">(</span><span class="nx">PORT</span><span class="p">).</span><span class="nx">then</span><span class="p">(</span><span class="kd">function</span><span class="p">({</span> <span class="nx">url</span> <span class="p">})</span> <span class="p">{</span>
+<span class="lineno">25 </span>  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="sb">`Server listening at </span><span class="cp">${</span><span class="n">url</span><span class="cp">}</span><span class="sb">.`</span><span class="p">);</span>
+<span class="lineno">26 </span><span class="p">});</span>
+</pre></div>
+<p class='mt-3'>This simple file will create a GraphQL HTTP server. When this file is run it creates an instance of ApolloServer. It takes an options object as its parameter with two required properties: typeDefs and resolvers. TypeDefs is a string representing the GraphQL schema. Resolvers is a map of functions that implement your schema.</p>
+<p>The server is listening for connections to localhost port 4000. Actually, ApolloServer uses port 4000 by default so you could leave the port out.</p>
+<p>You may have noticed that there is no Express. Express is the most popular web framework for Node.js. So what gives? Well, Express is there. It's a dependency of apollo-server, along with apollo-server-express, which connects apollo-server with express. Apollo-server uses them behind the scenes. For existing Express apps, if you want to keep Express in the foreground I'll show you how to do that at the end of this tutorial.</p>
+
+<h4>Start the Server</h4>
+<p class='mb-1'>Now that you have a server for your app, there are a few different commands you can use to run it. I'll cover them briefly. First there is a standard node command to execute any file:</p>
+<li class="dlr"><code>node server.js</code> or just <code>node server</code></li>
+<p>This should log "Server listening at http://localhost:4000/." in the terminal, and if you open a browser to localhost:4000 you should see the GraphQL Playground (more on that in a minute). To stop the server, from the terminal press CTRL+C,</p>
+<p class='mb-1'>We put a start script in the package.json file. You call the scripts in your package.json file with <code>npm run <i>script-name</i></code> or in a few cases "run" is optional.</p>
+<li class="dlr"><code>npm start</code></li>
+<p class='mt-1'>We add this script because many production servers start the app by calling npm start.</p>
+<p class='mt-3 mb-1'>The third way to execute the server.js file is to use the nodemon command. We installed nodemon for hot reloading. To use it just enter <code>nodemon</code> and it looks for a file named server.js to run by default. This is the command we'll use throughout this tutorial.</p>
+<li class="dlr"><code>nodemon</code></li>
+
+<h4 class='mt-3'>GraphQL Playground</h4>
+<p>Both apollo-server and express-graphql come with GUI tools that you run in your browser on your app's URL to send HTTP requests. Apollo-server's tool is called GraphQL Playground. It is similar to API request tools like Postman or Curl except it is specific to a GraphQL API.</p>
+<p>Let's test out our Hello World app by pasting a query in the left side panel:</p>
+<pre>
+{
+  hello
+}
+</pre>
+<p>Then run it by clicking on the Execute Query button in the middle. The output should look like:</p>
+<pre>
+{
+  "data": {
+    "hello": "world"
+  }
+}
+</pre>
+<p>Now let's build something closer to a real app. One that uses a database.</p>
+<hr>
+
+<!-- Mongo Database -->
+<div id="mongo"></div>
+<script>
+const partial = document.getElementById('mongo');
+fetch('_mongo.html')
+  .then((response) => response.text())
+  .then((body) => partial.innerHTML = body);
+</script>
+<!-- db.articles.insert({title: "Learn Node.js", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."}) -->
+
+<hr>
+<h4>Mongoose ORM</h4>
+<p>We installed the mongoose package in our app. Mongoose is a middleware library that performs the Object Relational Mapping (ORM) between our web application and MongoDB. In essence it does the translations allowing them to talk to each other.</p>
+
+<p>We'll start by using Mongoose to connect to MongoDB in our server file. Let's replace the hello world response with our real code. This is all the code we will use for this file, but I'll only explain the Mongoose code for now.</p>
+<div class='filename'>Server.js</div>
+<div class="highlight" style="margin-top: 0px;"><pre>
+<span></span><span class="lineno"> 1 </span><span class="kr">const</span> <span class="p">{</span> <span class="nx">ApolloServer</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;apollo-server&#39;</span><span class="p">);</span>
+<span class="linenum">1. </span><span class="kr">const</span> <span class="nx">mongoose</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;mongoose&#39;</span><span class="p">);</span>
+<span class="lineno"> 3 </span>
+<span class="lineno"> 4 </span><span class="kr">const</span> <span class="nx">typeDefs</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;./graphql/typeDefs&#39;</span><span class="p">);</span>
+<span class="lineno"> 5 </span><span class="kr">const</span> <span class="nx">resolvers</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;./graphql/resolvers&#39;</span><span class="p">);</span> 
+<span class="lineno"> 6 </span>
+<span class="linenum">2. </span><span class="kr">const</span> <span class="nx">PORT</span> <span class="o">=</span> <span class="mi">4000</span><span class="p">;</span> 
+<span class="linenum">3. </span><span class="kr">const</span> <span class="nx">MONGODB_URI</span> <span class="o">=</span> <span class="s2">&quot;mongodb://localhost:27017/my_local_db&quot;</span><span class="p">;</span>   
+<span class="lineno"> 9 </span>
+<span class="linenum">4. </span><span class="nx">mongoose</span><span class="p">.</span><span class="nx">connect</span><span class="p">(</span><span class="nx">MONGODB_URI</span><span class="p">,</span> <span class="p">{</span> <span class="nx">useNewUrlParser</span><span class="o">:</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">useFindAndModify</span><span class="o">:</span> <span class="kc">false</span> <span class="p">});</span> 
+<span class="linenum">5. </span><span class="nx">mongoose</span><span class="p">.</span><span class="nx">connection</span><span class="p">.</span><span class="nx">once</span><span class="p">(</span><span class="s1">&#39;open&#39;</span><span class="p">,</span> <span class="kd">function</span><span class="p">()</span> <span class="p">{</span> 
+<span class="lineno">12 </span>  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;Connected to the Database.&#39;</span><span class="p">);</span>
+<span class="lineno">13 </span><span class="p">});</span>
+<span class="lineno">14 </span><span class="nx">mongoose</span><span class="p">.</span><span class="nx">connection</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s1">&#39;error&#39;</span><span class="p">,</span> <span class="kd">function</span><span class="p">(</span><span class="nx">error</span><span class="p">)</span> <span class="p">{</span>
+<span class="lineno">15 </span>  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;Mongoose Connection Error : &#39;</span> <span class="o">+</span> <span class="nx">error</span><span class="p">);</span>
+<span class="lineno">16 </span><span class="p">});</span>
+<span class="lineno">17 </span>
+<span class="lineno">18 </span><span class="kr">const</span> <span class="nx">server</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">ApolloServer</span><span class="p">({</span> 
+<span class="lineno">19 </span>  <span class="nx">typeDefs</span><span class="p">,</span> 
+<span class="lineno">20 </span>  <span class="nx">resolvers</span> 
+<span class="lineno">21 </span><span class="p">});</span>
+<span class="lineno">22 </span>
+<span class="lineno">23 </span><span class="nx">server</span><span class="p">.</span><span class="nx">listen</span><span class="p">(</span><span class="nx">PORT</span><span class="p">).</span><span class="nx">then</span><span class="p">(({</span> <span class="nx">url</span> <span class="p">})</span> <span class="o">=&gt;</span> <span class="p">{</span>
+<span class="lineno">24 </span>  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="sb">`Server listening at </span><span class="cp">${</span><span class="n">url</span><span class="cp">}</span><span class="sb">.`</span><span class="p">);</span>
+<span class="lineno">25 </span><span class="p">});</span>
+</pre></div>
+<ol>
+<li>Import the mongoose package.</li>
+<li>Assigning constants for things like port number and the database URL gives us the flexibility to change the values in one place depending on whether we are in development or production environments.</li>
+<li>MONGODB_URI:<br>
+  If you are using the MongoDB Atlas cloud database then paste the link there.<br>
+  If you are using the local version, MongoDB is accessed through localhost on port 27017 by default, and the path is the database name. We'll just call ours my_local_db.</li>
+<li><code>mongoose.connect()</code> connects to your MongoDB database. The useNewUrlParser and useFindAndModify options are Mongoose requirements for some deprecation transitions. You'll get a warning if you leave them out.</li>
+<li>Optionally, log a message if the above connection was successful and one if it is not.</li>
+</ol>
+
+<h4>Cors</h4>
+<p>Let's talk briefly about Cross-Origin Resource Sharing (CORS). By default Express will block cross-origin HTTP requests for security reasons. Cross-origin means the request is from a different origin (domain, protocol, and/or port) than its own origin. Our API is served on localhost port 4000. If our API is accessed by mobile apps for example they will be on a different origin and any requests will be rejected by default. To allow access from any origin (or from origins that you specify) you can install and configure an npm package called cors. That will apply additional HTTP headers to tell the browser to allow cross-origin access.</p>
+<p>An API paired with a dedicated client like React is really an integrated single web application even if the back end and front end run independently. In our app we only want to give access to the integrated front end (our React client in this case). When we create the Client we'll make our API a proxy for that app (explained later) and therefore won't need the cors package.</p>
+<p class='mb-1'>If you also want the API to be accessed by mobile apps or other websites then you need to install the cors middleware package and connect it to your app.</p>
+<li class="dlr"><code>npm install cors</code></li>
+<pre>
+// server
+...
+<b>const cors = require('cors');</b>
+...
+const server = new ApolloServer({ 
+  typeDefs, 
+  resolvers,
+  <b>cors: true</b>
+});
+</pre>
+<p class='mt-1'>Install and import the cors package. Then add it as an option to the the ApolloServer instance.</p>
+<p>For more on the CORS concept see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS">developer.mozilla.org/en-US/docs/Web/HTTP/CORS</a></p>
+
+<h4>The Model</h4>
+<p>Populate the model file with the below:</p>
+<div class="filename">models/article.js</div>
+<div class="highlight"><pre><span></span><span class="lineno"> 1 </span><span class="kr">const</span> <span class="p">{</span> <span class="nx">Schema</span><span class="p">,</span> <span class="nx">model</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;mongoose&#39;</span><span class="p">);</span>
+<span class="lineno"> 2 </span>
+<span class="linenum">1. </span><span class="kr">const</span> <span class="nx">articleSchema</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">Schema</span><span class="p">({</span> 
+<span class="lineno"> 4 </span>  <span class="nx">title</span><span class="o">:</span> <span class="p">{</span>
+<span class="lineno"> 5 </span>    <span class="nx">type</span><span class="o">:</span> <span class="nb">String</span><span class="p">,</span>
+<span class="lineno"> 6 </span>    <span class="nx">required</span><span class="o">:</span> <span class="kc">true</span>
+<span class="lineno"> 7 </span>  <span class="p">},</span>
+<span class="lineno"> 8 </span>  <span class="nx">content</span><span class="o">:</span> <span class="p">{</span>
+<span class="lineno"> 9 </span>    <span class="nx">type</span><span class="o">:</span> <span class="nb">String</span><span class="p">,</span>
+<span class="lineno">10 </span>    <span class="nx">required</span><span class="o">:</span> <span class="kc">true</span>
+<span class="lineno">11 </span>  <span class="p">}</span>
+<span class="lineno">12 </span><span class="p">});</span>
+<span class="lineno">13 </span>
+<span class="linenum">2. </span><span class="nx">module</span><span class="p">.</span><span class="nx">exports</span> <span class="o">=</span> <span class="nx">model</span><span class="p">(</span><span class="s1">&#39;Article&#39;</span><span class="p">,</span> <span class="nx">articleSchema</span><span class="p">);</span>
+</pre></div>
+<ol>
+  <li>A database schema is it's structure. The mongoose schema is a prototype that maps to a MongoDB collection and defines the shape of the documents within that collection. Here we are creating an instance of mongoose.Schema that defines two fields with type set to String and making them required. Mongoose Schema reference: <a href="https://mongoosejs.com/docs/guide.html">mongoosejs.com/docs/guide.html</a>.</li>
+  <li>
+    Models represent the data in an application. A mongoose model is a constructor function that creates and reads documents to and from the underlying MongoDB database. The first argument is the singular uppercase name of your database collection. So Article represents the articles MongoDB collection. The second argument is the schema which we defined above. An individual article is an instance of the Article model.
+  </li>
+</ol>
+<!-- -------------------------------------------- -->
+<hr>
+<h2 id="routes">GraphQL</h2>
+<p>If you are brand new to GraphQL I recommend going through the Getting Started tutorial on their website <a href="https://graphql.org/graphql-js/">https://graphql.org/graphql-js</a>. This tutorial is the next level up from where that ends. I won't repeat the basics here but will apply them to a real (albeit super basic) application with an actual database. And use all four CRUD operations.</p>
+
+<p>I skipped over explaining the Apollo/GraphQL specific code in the server.js file so I'll cover it now:</p>
+<pre>
+<span>// server.js</span>
+
+const { ApolloServer } = require('apollo-server'); <span>#1</span>
+const typeDefs = require('./graphql/typeDefs');
+const resolvers = require('./graphql/resolvers'); 
+...
+const server = new ApolloServer({                  <span>#2</span>
+  typeDefs,                                        <span>#3</span>
+  resolvers 
+});
+</pre>
+<ol>
+<li>Import the apollo-server package which will set up our GraphQL HTTP server.</li>
+<li>Create an instance of ApolloServer and assign it to a variable.</li>
+<li>There are two properties we must pass into to the ApolloServer constructor function when we create our ApolloServer instance: typeDefs and resolvers. I'll explain each in turn.</li>
+</ol>
+<h4>TypeDefs</h4>
+<p>TypeDefs is a required property when creating an ApolloServer instance. It is a string representations of GraphQL schema in GraphQL's Schema Definition Language (SDL). It is generated by the gql function. If you have multiple TypeDefs files you can put them in an Array and ApolloServer will concatenate them.</p>
+<p>Populate the typeDefs file with the below:</p>
+<div class="filename">graphql/typeDefs.js</div>
+<div class="highlight"><pre><span></span><span class="linenum">1. </span><span class="kr">const</span><span class="p">{</span> <span class="nx">gql</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;apollo-server&#39;</span><span class="p">);</span> 
+<span class="lineno"> 2 </span>
+<span class="linenum">2. </span><span class="kr">const</span> <span class="nx">typeDefs</span> <span class="o">=</span>  <span class="nx">gql</span><span class="p">(</span><span class="sb">` </span>
+<span class="linenum">3. </span><span class="sb">type Article { </span>
+<span class="lineno"> 5 </span><span class="sb">  id: ID!</span>
+<span class="lineno"> 6 </span><span class="sb">  title: String!</span>
+<span class="lineno"> 7 </span><span class="sb">  content: String!</span>
+<span class="lineno"> 8 </span><span class="sb">}</span>
+<span class="linenum">4. </span><span class="sb">input ArticleInput { </span>
+<span class="lineno">10 </span><span class="sb">  title: String!</span>
+<span class="lineno">11 </span><span class="sb">  content: String!</span>
+<span class="lineno">12 </span><span class="sb">}</span>
+<span class="linenum">5. </span><span class="sb">type Query { </span>
+<span class="lineno">14 </span><span class="sb">  articles: [Article]</span>
+<span class="lineno">15 </span><span class="sb">  article(id: ID!): Article</span>
+<span class="lineno">16 </span><span class="sb">}</span>
+<span class="linenum">6. </span><span class="sb">type Mutation { </span>
+<span class="lineno">18 </span><span class="sb">  createArticle(articleInput: ArticleInput): Article</span>
+<span class="lineno">19 </span><span class="sb">  deleteArticle(id: ID!): Article</span>
+<span class="lineno">20 </span><span class="sb">  updateArticle(id: ID!, articleInput: ArticleInput): Article!</span>
+<span class="lineno">21 </span><span class="sb">}</span>
+<span class="lineno">22 </span><span class="sb">`</span><span class="p">)</span>
+<span class="lineno">23 </span>
+<span class="linenum">7. </span><span class="nx">module</span><span class="p">.</span><span class="nx">exports</span> <span class="o">=</span> <span class="nx">typeDefs</span><span class="p">;</span> 
+</pre></div>
+<ol>
+<li>Import the gql function from apollo-server. This is actually coming from the graphql library behind the scenes, which is why we had to install the graphql npm package.</li>
+<li>The gql function creates a GraphQL schema object from the GraphQL schema language, which is structured like JSON. You pass it in as one big string.</li>
+<li>GraphQL, unlike JavaScript, is strongly typed meaning you have to explicitly specify the data types. Here we are defining Article as a type. And we are specifying it's fields, and what each field's data type is. The GraphQL schema language supports the scalar types of String, Int, Float, Boolean, and ID. Adding ! at the end means the field is required.</li>
+<li>We'll use an input for our Create and Update mutations. Set required string fields for title and content.</li>
+<li>List the queries we will accept and what will be returned. So here we accept a query called article with id as it's parameter that returns the Article type defined above. We also accept a query called articles and return an array of the Article type defined above. Putting Article in brackets signifies that it will be an array of articles. "Article" and "articles" are the names of resolver functions that will make the actual queries to the the mongoDB database and return the results. We could define them in this file but we'll define them in a separate resolver file.</li>
+<li>Mutations are HTTP requests to modify data. We'll define three, which will call resolver functions to create, delete, and update an Article.</li>
+<li>Export the typeDefs object for it to be used as the schema for our graphqlHTTP server.</li>
+</ol>
+
+<h4>Resolvers</h4>
+<p>Resolvers is the other required property after typeDefs when creating an ApolloServer instance. Resolvers is an object that maps resolvers with the types defined in typeDefs. The resolvers are grouped by category (i.e., Query, Mutation, Subscription, or custom).  For each resolver the key should be the type name and the value should be a function to be executed for that type.</p>
+<p>Each resolver is the equivalent to an endpoint in a RESTful API. Instead of an HTTP method/URL path combinations like GET example.com/articles, the client sends a named query or mutation that is equal to one of the resolver functions. The resolver functions are where we will interact with the database. In our case it is MongoDB with Mongoose.js as our ORM. Let's define these now:</p>
+
+<div class="filename">graphql/resolvers.js</div>
+<div class="highlight"><pre><span></span><span class="linenum">1. </span><span class="kr">const</span> <span class="nx">Article</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;../models/article&#39;</span><span class="p">);</span>          
+<span class="lineno"> 2 </span>
+<span class="lineno"> 3 </span><span class="kr">const</span> <span class="nx">resolvers</span> <span class="o">=</span> <span class="p">{</span>
+<span class="lineno"> 4 </span>  <span class="nx">Query</span><span class="o">:</span> <span class="p">{</span>
+<span class="linenum">2. </span>    <span class="nx">articles</span><span class="o">:</span> <span class="kd">function</span><span class="p">()</span> <span class="p">{</span>                     
+<span class="lineno"> 6 </span>      <span class="k">return</span> <span class="nx">Article</span><span class="p">.</span><span class="nx">find</span><span class="p">({});</span>
+<span class="lineno"> 7 </span>    <span class="p">},</span>
+<span class="lineno"> 8 </span>    <span class="nx">article</span><span class="o">:</span> <span class="kd">function</span><span class="p">(</span><span class="nx">parent</span><span class="p">,</span> <span class="nx">args</span><span class="p">)</span> <span class="p">{</span>
+<span class="lineno"> 9 </span>      <span class="k">return</span> <span class="nx">Article</span><span class="p">.</span><span class="nx">findById</span><span class="p">(</span><span class="nx">args</span><span class="p">.</span><span class="nx">id</span><span class="p">)</span>
+<span class="lineno">10 </span>    <span class="p">}</span>
+<span class="lineno">11 </span>  <span class="p">},</span>
+<span class="lineno">12 </span>  <span class="nx">Mutation</span><span class="o">:</span> <span class="p">{</span>
+<span class="lineno">13 </span>    <span class="nx">createArticle</span><span class="o">:</span> <span class="kd">function</span><span class="p">(</span><span class="nx">parent</span><span class="p">,</span> <span class="nx">args</span><span class="p">)</span> <span class="p">{</span>
+<span class="lineno">14 </span>      <span class="kd">let</span> <span class="nx">article</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">Article</span><span class="p">(</span><span class="nx">args</span><span class="p">.</span><span class="nx">articleInput</span><span class="p">);</span>
+<span class="lineno">15 </span>      <span class="k">return</span> <span class="nx">article</span><span class="p">.</span><span class="nx">save</span><span class="p">();</span>
+<span class="lineno">16 </span>    <span class="p">},</span>
+<span class="lineno">17 </span>    <span class="nx">deleteArticle</span><span class="o">:</span> <span class="kd">function</span><span class="p">(</span><span class="nx">parent</span><span class="p">,</span> <span class="nx">args</span><span class="p">)</span> <span class="p">{</span>
+<span class="lineno">18 </span>      <span class="k">return</span> <span class="nx">Article</span><span class="p">.</span><span class="nx">findByIdAndRemove</span><span class="p">(</span><span class="nx">args</span><span class="p">.</span><span class="nx">id</span><span class="p">);</span>
+<span class="lineno">19 </span>    <span class="p">},</span>
+<span class="lineno">20 </span>    <span class="nx">updateArticle</span><span class="o">:</span> <span class="kd">function</span><span class="p">(</span><span class="nx">parent</span><span class="p">,</span> <span class="nx">args</span><span class="p">)</span> <span class="p">{</span>
+<span class="linenum">3. </span>      <span class="k">return</span> <span class="nx">Article</span><span class="p">.</span><span class="nx">findByIdAndUpdate</span><span class="p">(</span><span class="nx">args</span><span class="p">.</span><span class="nx">id</span><span class="p">,</span> <span class="nx">args</span><span class="p">.</span><span class="nx">articleInput</span><span class="p">,</span> <span class="p">{</span> <span class="k">new</span><span class="o">:</span> <span class="kc">true</span> <span class="p">});</span>
+<span class="lineno">22 </span>    <span class="p">}</span>
+<span class="lineno">23 </span>  <span class="p">}</span>
+<span class="lineno">24 </span><span class="p">};</span>
+<span class="lineno">25 </span>
+<span class="lineno">26 </span><span class="nx">module</span><span class="p">.</span><span class="nx">exports</span> <span class="o">=</span> <span class="nx">resolvers</span><span class="p">;</span> 
+</pre></div>
+<ol>
+<li>Import the Article model which connects us to the database.</li>
+<li>There is one resolver function per API endpoint. Each performs a CRUD action on the database and returns the result. The find, findById, save, findByIDandRemove, and findByIdAndUpdate are all methods from the Mongoose ORM.</li>
+<li>The <i>Model</i>.findByIdAndUpdate(<i>id, update, options, callback</i>) method returns the original document by default not the updated one. To return the updated object you need to add the {new: true} option.</li>
+</ol>
+
+<hr>
+<h4>Test the API with GraphQL Playground</h4>
+<p class='mb-1'>ApolloServer includes a web interface where you can send queries and mutations to the API. We used it briefly to test the Hello World app. Let's try it again, this time we'll test out our API against the database and make sure that the CRUD operations all work.</p>
+<p>First, if you are using a local MongoDB database, make sure it is running.</p>
+<li class="dlr"><code>mongo</code></li>
+<p class="my-1">With all the changes we made it would be a good idea to restart the server.</p>
+<code>CTRL+C</code>
+<li class="dlr"><code>nodemon</code></li>
+<p class='mt-3'>Open the browser to <b>localhost:4000</b>. Note that since we are only using Apollo-Server and not Express, we have no routers. That means the API will ignore any path you tack on to the domain. Localhost:4000/this/is/a/bogus/path will also work.</p>
+<p>In the browser you'll see the GraphQL API interface. In the panel on the left enter the createArticle mutation:</p>
+<pre>
+mutation {
+  createArticle(articleInput: { title: "Learn GraphQL", content: "Blah blah."}) {
+    id, title, content
+  }
+}
+</pre>
+<p>This mutation will call the createArticle endpoint we defined on the resolvers file, passing in the articleInput object with values for the title and content properties. The property names in the curly braces are what we want returned if the mutation is successful. Click the execute button on the center and you should see the output on the panel to the right.</p>
+<p>Change the title and press it again so we have another article.</p>
+<p>Now let's do a query to to see our articles:</p>
+<pre>
+query {
+  articles {
+    title
+    content
+    id
+  }
+}
+</pre>
+<p>Press the execute button and you should see the articles you created. Copy the id of one of them and enter another query. (Note: query is the default type so you can leave off the word "query" if you like).</p>
+<pre>
+query {
+  article(id: "<i>article-id-here</i>") {
+    id
+    title
+    content
+  }
+}
+</pre>
+<p>Update that same article:</p>
+<pre>
+mutation {
+  updateArticle(id: "<i>article-id-here</i>", articleInput: { title: "Learn MongoDB", content: "Blah blah." }) {
+    id, title, content
+  }
+}
+</pre>
+<p>Click execute and you should get the updated article back. <br>
+And finally, send a delete mutation:</p>
+<pre>
+mutation {
+  deleteArticle(id: "<i>article-id-here</i>") {
+    id, title, content
+  }
+}
+</pre>
+
+<p>Click execute and it should return null after deleting it. There is a history tab on the top left and if you click it you should see all the queries and mutations you ran. Select the the articles query then the Use button. It will queue up the query so you can execute it. The deleted article should be gone.</p>
+<p>There is a Docs menu on the right of the tool that lists all your query and mutation endpoints. You can drill down on it to see the available fields.</p>
+
+<p>If you are familiar with the Postman API query tool, recent versions have a GraphQL feature that allows you to do these same queries/mutations. It has the added advantage of being able to save your queries.</p>
+
+<hr>
+<p>Ta Da!, you are done with the API portion of the Build a GraphQL CRUD application with Node and React tutorial. If you want to add a React front end then on to part 2 <a href="react_app_with_graphql">Build a React app with GraphQL Tutorial</a></p>
+
+<hr>
+<h2>Bonus Section</h2>
+<h4>Install Apollo-Server on an existing Express App</h4>
+<p>If you want to tack GraphQL onto an existing Express app using Apollo-server most of the steps are the same as above. Just make the below changes.</p> 
+<p>In addition to the apollo-server and mongoose packages, you need to install express and apollo-server-express. Technically they are already installed as dependencies to apollo-express, but it's cleaner to install them explicitly so they get listed in package.json:</p>
+<li class="dlr"><code>npm install express apollo-server-express</code></li>
+<p>Then change the server.js file to the below. The changes are bolded.</p>
+
+<div class="filename">server.js</div>
+<div class="highlight"><pre>
+<span class="lineno"> 6 </span><span class="callout"><span class="kr">const</span> <span class="nx">express</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;express&#39;</span><span class="p">);</span></span>
+<span class="lineno"> 7 </span><span class="callout"><span class="kr">const</span> <span class="p">{</span> <span class="nx">ApolloServer</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;apollo-server-express&#39;</span><span class="p">);</span></span>
+<span class="lineno"> 8 </span><span class="kr">const</span> <span class="nx">mongoose</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;mongoose&#39;</span><span class="p">);</span>
+<span class="lineno"> 9 </span>
+<span class="lineno">10 </span><span class="kr">const</span> <span class="nx">typeDefs</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;./graphql/typeDefs&#39;</span><span class="p">);</span>
+<span class="lineno">11 </span><span class="kr">const</span> <span class="nx">resolvers</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;./graphql/resolvers&#39;</span><span class="p">);</span> 
+<span class="lineno">12 </span>
+<span class="lineno">13 </span><span class="kr">const</span> <span class="nx">PORT</span> <span class="o">=</span> <span class="mi">4000</span><span class="p">;</span> 
+<span class="lineno">14 </span><span class="kr">const</span> <span class="nx">MONGODB_URI</span> <span class="o">=</span> <span class="s2">&quot;mongodb://localhost:27017/my_local_db&quot;</span><span class="p">;</span>   
+<span class="lineno">15 </span>
+<span class="lineno">16 </span><span class="callout"><span class="kr">const</span> <span class="nx">app</span> <span class="o">=</span> <span class="nx">express</span><span class="p">();</span></span>
+<span class="lineno">17 </span>
+<span class="lineno">18 </span><span class="nx">mongoose</span><span class="p">.</span><span class="nx">connect</span><span class="p">(</span><span class="nx">MONGODB_URI</span><span class="p">,</span> <span class="p">{</span> <span class="nx">useNewUrlParser</span><span class="o">:</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">useFindAndModify</span><span class="o">:</span> <span class="kc">false</span> <span class="p">});</span> 
+<span class="lineno">19 </span><span class="nx">mongoose</span><span class="p">.</span><span class="nx">connection</span><span class="p">.</span><span class="nx">once</span><span class="p">(</span><span class="s1">&#39;open&#39;</span><span class="p">,</span> <span class="kd">function</span><span class="p">()</span> <span class="p">{</span> 
+<span class="lineno">20 </span>  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;Connected to the Database.&#39;</span><span class="p">);</span>
+<span class="lineno">21 </span><span class="p">});</span>
+<span class="lineno">22 </span><span class="nx">mongoose</span><span class="p">.</span><span class="nx">connection</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s1">&#39;error&#39;</span><span class="p">,</span> <span class="kd">function</span><span class="p">(</span><span class="nx">error</span><span class="p">)</span> <span class="p">{</span>
+<span class="lineno">23 </span>  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;Mongoose Connection Error : &#39;</span> <span class="o">+</span> <span class="nx">error</span><span class="p">);</span>
+<span class="lineno">24 </span><span class="p">});</span>
+<span class="lineno">25 </span>
+<span class="lineno">26 </span><span class="kr">const</span> <span class="nx">server</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">ApolloServer</span><span class="p">({</span> 
+<span class="lineno">27 </span>  <span class="nx">typeDefs</span><span class="p">,</span> 
+<span class="lineno">28 </span>  <span class="nx">resolvers</span> 
+<span class="lineno">29 </span><span class="p">});</span>
+<span class="lineno">30 </span>
+<span class="lineno">31 </span><span class="callout"><span class="nx">server</span><span class="p">.</span><span class="nx">applyMiddleware</span><span class="p">({</span> <span class="nx">app</span><span class="p">,</span> <span class="nx">path</span><span class="o">:</span> <span class="s1">&#39;/graphql&#39;</span> <span class="p">});</span></span>
+<span class="lineno">32 </span>
+<span class="lineno">33 </span><span class="callout"><span class="nx">app</span><span class="p">.</span><span class="nx">listen</span><span class="p">(</span><span class="nx">PORT</span><span class="p">,</span> <span class="kd">function</span><span class="p">()</span> <span class="p">{</span> 
+<span class="lineno">34 </span>  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="sb">`Server listening on port </span><span class="cp">${</span><span class="n">PORT</span><span class="cp">}</span><span class="sb">.`</span><span class="p">);</span>
+<span class="lineno">35 </span><span class="p">});</span></span>
+</pre></div>
+
+<p class='mb-1'>Most of this is the standard Express setup.</p>
+<li>You import Express.</li>
+<li>Call express() to instantiate an instance of express and assign it to a variable called "app".</li>
+<li>Listen for connections to your app with express's listen() method.</li>
+
+<p class='mt-3'>On the ApolloServer side, most of this is the same. You create an instance of ApolloServer passing in typeDefs and resolvers as the options parameter. But this time you add the express app as middleware, and you set an explicit path for the graphql endpoint. The other files remain the same. That's it!</p>
+
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>MERN App with GraphQL Tutorial</title>
+  <meta name="description" content="Tutorial on how to build a web app using the MERN stack. This is a full CRUD (Create-Read-Update-Delete) app with a RESTful API."> 
+  <meta name="keywords" content="GraphQL, Apollo, Apollo-Boost, React-Apollo, React, MERN App, CRUD App">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Build a React app with GraphQL Tutorial</h1>
+  <p>Part 2 of a 2 part series on building a GraphQL MERN Stack (MongoDB-Express-React-Node) with Apollo that performs all four CRUD operations (Create-Read-Update-Delete).</p>
+  <p>By Steve Carey - 7/26/2019</p>
+  <p>Part 1 of this tutorial: <a href="graphql_api_with_apollo_server">Build a GraphQL API with Node.js and Apollo-Server</a></p>
+  <p>Finished code: <a href="https://github.com/steve981cr/mern-with-graphql-and-apollo-server">Github</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<h2>Introduction</h2>
+<p>In this tutorial we will integrate a React client into our GraphQL API with the help if the Apollo client package. We will build an interface to perform the four CRUD actions on the database. The main focus of this tutorial is on the GraphQL and Apollo portions. If you are new to React I still recommend doing this tutorial. I won't be explaining the basic React concepts like props and state but you'll able to see them in action. Then you can go back and build a tic tac toe game like they do in their <a href="https://reactjs.org/tutorial/tutorial.html">introductory tutorial</a>.</p>
+
+<!-- react_apollo_client -->
+<hr class="space" id='react'>
+<h3>Setup</h3>
+<h4>Create-react-app</h4>
+<p>You need to have Node and Yarn installed on your computer to use React. We will install and use create-react-app to get us going.</p>
+<p class='mb-1'>Create-react-app is a Node package developed by Facebook that gives you a starter app out of the box. It includes an already configured Webpack server that bundles all the JavaScript files in the app into a bundle.js file that gets attached into the index.html file at runtime. At runtime, Webpack’s dev server will listen for you to save changes in develepment, and will automatically load your running web page with the changes. This is called hot reloading. Install it as a Node global package:</p>
+<li class="dlr"><code>npm install -g create-react-app</code></li>
+
+<p class='mt-3 mb-1'>Yarn and npm (Node Package Manager) are both package managers for managing JavaScript dependencies. You can use either, but since React and Yarn were both created by Facebook, they tend to interact tightly together so we will be using Yarn to install packages and run the server. Install it globally if it's not already installed.</p>
+<li class="dlr"><code>npm install -g yarn</code></li>
+
+<p class='mt-3 mb-1'>We already created a GraphQL API that we will be using as our back end. We could keep the front end and back end code in completely separate locations, but if we are to deploy our application in production as an integrated web application it's easier to keep them together. Use the below command from your API project's root directory to add a directory called client, place a preconfigured React application there, and cd into it.</p>
+
+<li class="dlr"><code>create-react-app client && cd client</code></li>
+
+<p class='mt-3 mb-1'>Run the server to make sure it's working:</p>
+<p class="dlr"><code>yarn start</code></p>
+<p>You should see the default Welcome to React app in your browser at localhost:3000.</p>
+
+<hr>
+<h4>client/package.json</h4>
+<p>The create-react-app generator created our package.json file. So now we have two of those. One for our API application and one for our React client. The generator installed the react, react-dom, and react-scripts packages. They will be listed as dependencies in the package.json file.</p>
+
+<p>Before you install the other packages you will be using let's make one change to the package.json file. Add a proxy property set to your API's port. This will automatically be added to the API routes you will call from the React client, so you only have to use the path, not the full URL in your code. That may not seem like much of a benefit since you only have to access one route on a GraphQL API. But doing so will help integrate the client with the API as if it was one application, preventing the cross domain access issues discussed in Part 1 of this tutorial. This makes it easier to deploy the app to a platform like Heroku.</p>
+<div class="filename">package.json</div>
+<div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;client&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;version&quot;</span><span class="p">:</span> <span class="s2">&quot;0.1.0&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;private&quot;</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+  <span class="callout"><span class="nt">&quot;proxy&quot;</span><span class="p">:</span> <span class="s2">&quot;http://localhost:4000&quot;</span><span class="p">,</span></span>
+  <span class="nt">&quot;dependencies&quot;</span><span class="p">:</span> <span class="p">{</span>
+  ...
+<span class="p">}</span>
+</pre></div>
+
+<p class='mb-1'>Install the additional packages we will need for our React app:</p>
+<p class="dlr"><code>yarn add react-router-dom bootstrap graphql react-apollo apollo-boost</code>
+<ul>
+  <li><b>React-router-dom</b>: Adds routes to your React app. Docs: <a href="https://reacttraining.com/react-router/web/guides/philosophy">reacttraining.com/react-router/web/guides</a></li>
+  <li><b>Bootstrap</b>: is a popular CSS library that we'll use for convenience and discuss a bit more in the stylesheets section.</li>
+</ul>
+
+<h4>GraphQL and Apollo</h4>
+<p>Let's talk about the GraphQL-related packages we installed.</p>
+<p><b>Graphql</b>: GraphQL servers are available in over a dozen different programming languages. The graphql package is its implementation in JavaScript.</p>
+<p>Apollo is a software company that provides a number of tools and services around the GraphQL query language. You don't have to use Apollo packages to use GraphQL with React, but it adds some advantages.</p>
+<p><b>Apollo-boost</b>: Apollo Client facilitates working with GraphQL data on the client side. The apollo-boost package installs and configures apollo-client and other apollo packages as its dependencies. This includes managing a central store of data which can either replace or at least compliment the Redux store. Apollo-boost is most commonly paired with React but it can be used with Angular or Vue as well.</p>
+<p>While you can use both Apollo and Redux to manage your React client's central store, it is best to use one or the other so you don't have two sources of truth. Apollo provides some useful functionality that you would have to code yourself with Redux. It automatically adds GraphQL query results to the store. You can store local data with Apollo as well.</p>
+<p><b>React-apollo</b>: connects the graphql and apollo-boost libraries with your React code. We will be using ApolloProvider, Query, and Mutation components from the react-apollo library.</p>
+
+<hr>
+<h4>File Structure</h4>
+<p>If you look at the files and directories generated in the client directory, besides a folder for the node_modules you'll see a "public" and a "src" directory. These are where you add your own files. Right now there are no sub-directories in those folders so things can get pretty cluttered quickly if you don't add some structure. From the <i>client</i> directory you can use these UNIX commands to add and remove the relevant directories and files. Or do it from your text editor if you prefer.</p>
+<pre>
+rm README.md
+rm -rf .git
+mkdir -p src/components/pages
+touch src/components/pages/Home.js
+mkdir src/components/articles
+touch src/components/articles/ArticleList.js
+touch src/components/articles/ArticleInfo.js
+touch src/components/articles/ArticleAdd.js
+touch src/components/articles/ArticleEdit.js
+mkdir src/graphql
+touch src/graphql/articleQueries.js
+</pre>
+<p>We removed some unnecessary files including the git repository that create-react-app generated for us. We won't be using git in this tutorials but if we were we would generate a git repository in the project root directory for the API and React client combined. You can leave the .gitignore file though since git allows multiple gitignore files.</p>
+<p>We created directories for our components. And we created a directory called graphql with a file called articleQueries. This is just so you can have the API query and mutation code in one location for purposes of this tutorial.</p>
+
+<h4>Stylesheets</h4>
+<p>The index.css file is for our app-wide css. If you want to add custom CSS classes that apply to the whole app this is where you would do it. The App.css file is specific to the App.component we are going to fill out. Delete the CSS that's in there now so it doesn't conflict with your app.</p>
+<div class="filename">src/app.css</div>
+<div class="highlight"><pre><span></span><span class="c">/* Remove all the CSS classes */</span>
+</pre></div>
+<p>To add css classes that apply only to a particular component you could create a css file in the same folder as that component and import it in the component(s) that use it.</p>
+
+<p><b>Bootstrap:</b> For convenience we're using Bootstrap for our styling. We installed the bootstrap package earlier. Now import it to the index.js file.
+
+<div class="filename">src/index.js</div>
+<div class="highlight"><pre><span></span><span class="kr">import</span> <span class="nx">React</span> <span class="nx">from</span> <span class="s1">&#39;react&#39;</span><span class="p">;</span>
+<span class="kr">import</span> <span class="nx">ReactDOM</span> <span class="nx">from</span> <span class="s1">&#39;react-dom&#39;</span><span class="p">;</span>
+<span class="callout"><span class="kr">import</span> <span class="s1">&#39;bootstrap/dist/css/bootstrap.css&#39;</span><span class="p">;</span></span>
+<span class="kr">import</span> <span class="s1">&#39;./index.css&#39;</span><span class="p">;</span>
+<span class="kr">import</span> <span class="nx">App</span> <span class="nx">from</span> <span class="s1">&#39;./App&#39;</span><span class="p">;</span>
+...
+</pre></div>
+<p>If you want to use the JavaScript features of Bootstrap like drop-down menus you can also install the <a href="https://react-bootstrap.netlify.com/">react-bootstrap package</a>, be we won't use those in this tutorial.</p>
+
+<hr class="space">
+<h3>Public/index.html - Our Single Page App</h3>
+<p>This is a Single-Page Application (SPA) with CRUD capabilities. It is single page because you only have one html file sitting in the public folder: public/index.html. It has your standard HTML page structure with one element inside the body, an empty div tag with an id named root <code>&lt;div id="root">&lt;/div></code>. That is where React renders it's output with JavaScript. There's nothing special about the name "root." It can be any name. We won't make any changes to this file.</p>
+
+<hr class="space">
+<h3>Src/index.js File</h3>
+<p>In the src/index.js file we import the React library and render our main component. Other than adding the Bootstrap import above, we don't need to make any changes to the src/index.js file. It should look like this.</p>
+
+<div class="filename">src/index.js</div>
+<div class="highlight"><pre><span></span><span class="linenum">1. </span><span class="kr">import</span> <span class="nx">React</span> <span class="nx">from</span> <span class="s1">&#39;react&#39;</span><span class="p">;</span>
+<span class="linenum">1. </span><span class="kr">import</span> <span class="nx">ReactDOM</span> <span class="nx">from</span> <span class="s1">&#39;react-dom&#39;</span><span class="p">;</span>
+<span class="lineno">3  </span><span class="kr">import</span> <span class="s1">&#39;bootstrap/dist/css/bootstrap.css&#39;</span><span class="p">;</span>
+<span class="lineno">4  </span><span class="kr">import</span> <span class="s1">&#39;./index.css&#39;</span><span class="p">;</span>
+<span class="linenum">1. </span><span class="kr">import</span> <span class="nx">App</span> <span class="nx">from</span> <span class="s1">&#39;./App&#39;</span><span class="p">;</span>
+<span class="lineno">6  </span><span class="kr">import</span> <span class="o">*</span> <span class="nx">as</span> <span class="nx">serviceWorker</span> <span class="nx">from</span> <span class="s1">&#39;./serviceWorker&#39;</span><span class="p">;</span>
+<span class="lineno">7 </span>
+<span class="linenum">2. </span><span class="nx">ReactDOM</span><span class="p">.</span><span class="nx">render</span><span class="p">(</span><span class="o">&lt;</span><span class="nx">App</span> <span class="o">/&gt;</span><span class="p">,</span> <span class="nb">document</span><span class="p">.</span><span class="nx">getElementById</span><span class="p">(</span><span class="s1">&#39;root&#39;</span><span class="p">));</span>
+<span class="linenum">3. </span><span class="nx">serviceWorker</span><span class="p">.</span><span class="nx">unregister</span><span class="p">();</span>
+</pre></div>
+<ol>
+<li>We import the React and ReactDOM libraries, and the App.jsx file (containing the App component). </li>
+<li>The ReactDOM module's render method is what renders your React components to the public/index.html page. It takes two arguments. The first calls our component which is a custom React element called "App", or whatever name you want to give it. The second argument is the target element where we will render the output from &lt;App />. In this case the element with the id of "root".</li>
+<li>The service worker is a web API that helps you cache your assets and other files so that when the user is offline or on a slow network they can still see results on the screen. It is actually not activated by default so we're leaving it that way as well (change .unregister to .register to make it active).</li>
+</ol>
+
+
+<hr class="space">
+<h3>React Components</h3>
+<p>With React you split your user interface into components. Each component returns some JSX which ultimately gets rendered as HTML to the user interface. In our case we are creating the front end to a CRUD application. We need components to correspond with the API's endpoints to perform the CRUD actions.</p> 
+
+<p>A few notes on syntax. We can use all the latest JavaScript syntax without worrying about browser compatibility because create-react-app installed Babel which compiles our JavaScript into ES5. We did not add the step of installing Babel in our API, so while we could still use most of the ES6 syntax, there are some features not yet supported by Node like the Import and Export syntax. But we can and will be using those here. Also, in general I am using the declaration syntax for functions rather than arrow functions just to make it explicit when you are returning a value. But there is no reason not to use arrow functions if you prefer it.</p>
+
+<p>The App.js component file holds the structure for our web page. The ArticleList, ArticleInfo, ArticleAdd, and ArticleEdit components represent views that correspond to the Read, Read and Delete, Create, and Update actions respectively. We'll also add a Home component to be our home page. Note that component names must be capitalized. In each file we will build one React component, with the exception of App.js where we build three. We could break it out even further, like a form component that gets imported to the ArticleAdd and ArticleEdit components, but we won't.</p>
+
+<h4>Home Component</h4>
+<p>Before we build our full CRUD app let's start out with a very simple component called Home. We already created an empty Home.js file. Populate it with the below:</p>
+
+<div class="filename">src/components/pages/Home.js</div>
+<div class="highlight" id='home'><pre><span></span><span class="linenum">1. </span><span class="kr">import</span> <span class="nx">React</span> <span class="nx">from</span> <span class="s1">&#39;react&#39;</span><span class="p">;</span> 
+<span class="lineno"> 2 </span>
+<span class="linenum">2. </span><span class="kd">function</span> <span class="nx">Home</span><span class="p">()</span> <span class="p">{</span> 
+<span class="lineno"> 4 </span>  <span class="k">return</span> <span class="p">(</span>
+<span class="lineno"> 5 </span>    <span class="o">&lt;</span><span class="nx">div</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;jumbotron&quot;</span><span class="o">&gt;</span>
+<span class="lineno"> 6 </span>      <span class="o">&lt;</span><span class="nx">h1</span><span class="o">&gt;</span><span class="nx">Home</span> <span class="nx">Page</span><span class="o">&lt;</span><span class="err">/h1&gt;</span>
+<span class="lineno"> 7 </span>    <span class="o">&lt;</span><span class="err">/div&gt;</span>
+<span class="lineno"> 8 </span>  <span class="p">);</span>
+<span class="lineno"> 9 </span><span class="p">}</span>
+<span class="lineno">10 </span>
+<span class="linenum">3. </span><span class="kr">export</span> <span class="k">default</span> <span class="nx">Home</span><span class="p">;</span>
+</pre></div>
+<ol>
+<li>Import React.</li>
+<li>Create a component. You can create components with functions or classes. In general, if you don't have to make it a class then don't. This component simply returns some JSX. JSX looks like HTML but it actually isn't. Not yet anyway. You'll notice subtle differences between JSX and HTML like you have to use the <i>className</i> attribute instead of <i>class</i> since "class" is a reserved word in JavaScript. But React ultimately converts JSX to HTML through its ReactDOM.render method.</li>
+<li>Export the component. In the next section we will import it in App.js.</li>
+</ol>
+<p>Right now this file is just sitting in space not connected to anything. If you want to see it in action you can temporarily open the src/index.js file and change the App elements to Home. Then go to your browser and it should now say "Home Page."</p>
+<pre>
+# src/index.js
+...
+import <mark>Home</mark> from './<mark>components/pages/Home</mark>';
+...
+ReactDOM.render(<mark>&lt;Home /></mark>, document.getElementById('root'));
+</pre>
+<p>Undo those index.js file changes back to the way it was (referencing "App").</p>
+
+<hr class="space">
+<h4>App component</h4>
+<p>The term Single-Page App can be a little misleading. While it is indeed a single html page, that doesn't mean you can't have multiple views with changes to the URL. We will use the React Router DOM package that we installed to do just that. And we will also perform the standard CRUD actions in our single page interacting with the API to get articles, post new articles, edit existing articles, and delete articles. Instead of doing those things all on separate HTML pages as you would in an traditional web app, we will do it from our single page sending queries and mutations to the API with the help of the GraphQL and Apollo packages we installed. React will move the data around using JavaScript which can add significant speed over entire page loads from the server.</p>
+<p>The central component for our app, generated by create-react-app is called "App." That is what was returning the Welcome to React page we saw in the browser. Replace that with a Navigation bar and a place to render the other components. Here is the code for the App.js file all at once:</p>
+
+<div class="filename">src/App.js</div>
+<div class="highlight"><pre><span></span><span class="kr">import</span> <span class="nx">React</span> <span class="nx">from</span> <span class="s1">&#39;react&#39;</span><span class="p">;</span>
+<span class="kr">import</span> <span class="nx">ApolloClient</span> <span class="nx">from</span> <span class="s1">&#39;apollo-boost&#39;</span><span class="p">;</span>
+<span class="kr">import</span> <span class="p">{</span> <span class="nx">ApolloProvider</span> <span class="p">}</span> <span class="nx">from</span> <span class="s1">&#39;react-apollo&#39;</span><span class="p">;</span>
+<span class="kr">import</span> <span class="p">{</span> <span class="nx">BrowserRouter</span> <span class="nx">as</span> <span class="nx">Router</span><span class="p">,</span> <span class="nx">Route</span><span class="p">,</span> <span class="nx">NavLink</span><span class="p">,</span> <span class="nx">Switch</span> <span class="p">}</span> <span class="nx">from</span> <span class="s1">&#39;react-router-dom&#39;</span><span class="p">;</span>
+<span class="kr">import</span> <span class="nx">Home</span> <span class="nx">from</span> <span class="s1">&#39;./components/pages/Home&#39;</span><span class="p">;</span>
+<span class="kr">import</span> <span class="nx">ArticleList</span> <span class="nx">from</span> <span class="s1">&#39;./components/articles/ArticleList&#39;</span><span class="p">;</span>
+<span class="kr">import</span> <span class="nx">ArticleInfo</span> <span class="nx">from</span> <span class="s1">&#39;./components/articles/ArticleInfo&#39;</span><span class="p">;</span>
+<span class="kr">import</span> <span class="nx">ArticleAdd</span> <span class="nx">from</span> <span class="s1">&#39;./components/articles/ArticleAdd&#39;</span><span class="p">;</span>
+<span class="kr">import</span> <span class="nx">ArticleEdit</span> <span class="nx">from</span> <span class="s1">&#39;./components/articles/ArticleEdit&#39;</span><span class="p">;</span>
+
+<span class="kr">const</span> <span class="nx">client</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">ApolloClient</span><span class="p">({</span>
+  <span class="nx">uri</span><span class="o">:</span> <span class="s1">&#39;/graphql&#39;</span>
+<span class="p">});</span>
+
+<span class="kd">function</span> <span class="nx">App</span><span class="p">()</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="p">(</span>
+    <span class="o">&lt;</span><span class="nx">ApolloProvider</span> <span class="nx">client</span><span class="o">=</span><span class="p">{</span><span class="nx">client</span><span class="p">}</span><span class="o">&gt;</span>
+      <span class="o">&lt;</span><span class="nx">Router</span><span class="o">&gt;</span>          
+        <span class="o">&lt;</span><span class="nx">Navigation</span> <span class="o">/&gt;</span>
+        <span class="o">&lt;</span><span class="nx">div</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;container&quot;</span><span class="o">&gt;</span>
+          <span class="o">&lt;</span><span class="nx">Main</span> <span class="o">/&gt;</span>
+        <span class="o">&lt;</span><span class="err">/div&gt;</span>
+      <span class="o">&lt;</span><span class="err">/Router&gt;</span>
+    <span class="o">&lt;</span><span class="err">/ApolloProvider&gt;</span>
+  <span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kd">function</span> <span class="nx">Navigation</span><span class="p">()</span> <span class="p">{</span>
+  <span class="k">return</span><span class="p">(</span>
+    <span class="o">&lt;</span><span class="nx">nav</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;navbar navbar-expand-lg navbar-dark bg-dark mb-4&quot;</span><span class="o">&gt;</span>
+      <span class="o">&lt;</span><span class="nx">div</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;container&quot;</span><span class="o">&gt;</span>
+        <span class="o">&lt;</span><span class="nx">ul</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;navbar-nav mr-auto&quot;</span><span class="o">&gt;</span>
+          <span class="o">&lt;</span><span class="nx">li</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;nav-item&quot;</span><span class="o">&gt;&lt;</span><span class="nx">NavLink</span> <span class="nx">exact</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;nav-link&quot;</span> <span class="nx">activeClassName</span><span class="o">=</span><span class="s2">&quot;active&quot;</span> <span class="nx">to</span><span class="o">=</span><span class="s2">&quot;/&quot;</span><span class="o">&gt;</span><span class="nx">Home</span><span class="o">&lt;</span><span class="err">/NavLink&gt;&lt;/li&gt;</span>
+          <span class="o">&lt;</span><span class="nx">li</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;nav-item&quot;</span><span class="o">&gt;&lt;</span><span class="nx">NavLink</span> <span class="nx">exact</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;nav-link&quot;</span> <span class="nx">activeClassName</span><span class="o">=</span><span class="s2">&quot;active&quot;</span> <span class="nx">to</span><span class="o">=</span><span class="s2">&quot;/articles&quot;</span><span class="o">&gt;</span><span class="nx">Articles</span><span class="o">&lt;</span><span class="err">/NavLink&gt;&lt;/li&gt;</span>
+        <span class="o">&lt;</span><span class="err">/ul&gt;</span>
+      <span class="o">&lt;</span><span class="err">/div&gt;  </span>
+    <span class="o">&lt;</span><span class="err">/nav&gt;</span>
+  <span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kd">function</span> <span class="nx">Main</span><span class="p">()</span> <span class="p">{</span>
+  <span class="k">return</span><span class="p">(</span>
+    <span class="o">&lt;</span><span class="nx">Switch</span><span class="o">&gt;</span>
+      <span class="o">&lt;</span><span class="nx">Route</span> <span class="nx">exact</span> <span class="nx">path</span><span class="o">=</span><span class="s2">&quot;/&quot;</span> <span class="nx">component</span><span class="o">=</span><span class="p">{</span><span class="nx">Home</span><span class="p">}</span> <span class="o">/&gt;</span>
+      <span class="o">&lt;</span><span class="nx">Route</span> <span class="nx">exact</span> <span class="nx">path</span><span class="o">=</span><span class="s2">&quot;/articles&quot;</span> <span class="nx">component</span><span class="o">=</span><span class="p">{</span><span class="nx">ArticleList</span><span class="p">}</span> <span class="o">/&gt;</span>
+      <span class="o">&lt;</span><span class="nx">Route</span> <span class="nx">exact</span> <span class="nx">path</span><span class="o">=</span><span class="s2">&quot;/articles/new&quot;</span> <span class="nx">component</span><span class="o">=</span><span class="p">{</span><span class="nx">ArticleAdd</span><span class="p">}</span> <span class="o">/&gt;</span>
+      <span class="o">&lt;</span><span class="nx">Route</span> <span class="nx">exact</span> <span class="nx">path</span><span class="o">=</span><span class="s2">&quot;/articles/:_id&quot;</span> <span class="nx">component</span><span class="o">=</span><span class="p">{</span><span class="nx">ArticleInfo</span><span class="p">}</span> <span class="o">/&gt;</span>
+      <span class="o">&lt;</span><span class="nx">Route</span> <span class="nx">exact</span> <span class="nx">path</span><span class="o">=</span><span class="s2">&quot;/articles/:_id/edit&quot;</span> <span class="nx">component</span><span class="o">=</span><span class="p">{</span><span class="nx">ArticleEdit</span><span class="p">}</span> <span class="o">/&gt;</span>
+    <span class="o">&lt;</span><span class="err">/Switch&gt;</span>
+  <span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kr">export</span> <span class="k">default</span> <span class="nx">App</span><span class="p">;</span>
+</pre></div>
+
+<p>First thing's first. Once you add the code and save the file, go to the browser and make sure you didn't get any errors. We removed the Welcome to React header and logo and replaced it with a navigation bar with two links, and a simple home page jumbotron. There is nothing in the articles link yet but we'll add that shortly.</p>
+<p>If you are familiar with React you may notice that we are using functional components rather than class components. That's because we are using Apollo Client to manage our state which it can do in a functional component. The React ecosystem is moving away from class components where they can, so we'll only be using functional components in this app. If you are new to React just bask in the happiness that you don't have to get bogged down with componentDidMount... or was it componentWillMount, no it was componentMightHaveMounted. Whatever, let's move on.</p>
+<p>This file actually contains three separate components... App, Navigation, and Main. But most of this code relates to Navigation and the React Router package. React Router is the most popular Routing package. The docs are at <a href="https://reacttraining.com/react-router/web/guides/philosophy">reacttraining.com/react-router/web/guides</a> which looks like a third party training site, and it is. But they are the ones who created the React Router package (not Facebook's React team).</p>
+<p>Alright, let's break this code down in sections. We'll start with the React import:</p>
+<pre>
+import React from 'react';
+</pre>
+<p>To create a component we need to import the React library.</p>
+
+<p><b>Create an instance of the Apollo Client</b></p>
+<pre>
+import ApolloClient from 'apollo-boost';
+...
+const client = new ApolloClient({
+  uri: '/graphql'
+});
+</pre>
+<p>Import ApolloClient from the apollo-boost libraries then create an instance of it assigned to variable "client". Pass in an object with a uri property. This is the url to our GraphQL API endpoint. We only put the path here because we added the domain and port as a proxy in the client/package.json file.</p>
+<p><b>The App component:</b></p>
+<pre>
+import { ApolloProvider } from 'react-apollo';
+import { BrowserRouter as Router, ... } from 'react-router-dom';
+...
+function App() {                      <span>#1</span>
+  return (
+    &lt;ApolloProvider client={client}>  <span>#2</span>
+      &lt;Router>                        <span>#3</span> 
+        &lt;Navigation />
+        &lt;div className="container">
+          &lt;Main />
+        &lt;/div>
+      &lt;/Router>
+    &lt;/ApolloProvider>
+  );
+}
+</pre>
+<ol>
+  <li>App is the top level component of our Application.</li>
+  <li>The first thing we are doing is connecting Apollo Client to the React app by wrapping it in the ApolloProvider component imported from react-apollo. And we pass our client to the client property. This allows us to access the client from any component in our component tree.</li>
+  <li>We imported the Router element from react-router-dom to manage the app's routing. It in turn contains two custom components that call the corresponding components defined below -- Navigation and Main. There is nothing special about those names, you could call them what you like. Those components return JSX that gets inserted into the App component.</li>
+</ol>
+
+<p><b>The Navigation component:</b></p>
+<pre>
+import { ... NavLink,... } from 'react-router-dom';
+...
+function Navigation() {                              <span>#1</span>
+  return(
+    &lt;nav className="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+      &lt;div className="container">
+        &lt;ul className="navbar-nav mr-auto">
+          &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/">Home&lt;/NavLink>&lt;/li>  <span>#2a</span>
+          &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/articles">Articles&lt;/NavLink>&lt;/li>  <span>#2b</span>
+        &lt;/ul>
+      &lt;/div>  
+    &lt;/nav>
+  );
+}
+</pre>
+<ol>
+<li>The Navigation component returns JSX that ultimately renders the nav bar using the Bootstrap classes we provide here.</li>
+<li>The React Router NavLink component is a subset of a Link component that we'll use shortly. It provides the activeClassName property to style the link differently when it's active. The other thing to note is the "exact" attribute, which is the shorthand for "exact=true." That means the route has to be the exact route provided with the "to" attribute. The default is that it just <i>contains</i> the route provided. So the "/" route by default would include any route that contains "/", which is all routes. So we need the <i>exact</i> attibute here.</li>
+</ol>
+
+<p><b>The Main component:</b></p>
+<pre>
+import { ... Route, ... Switch } from 'react-router-dom';
+import Home from './components/pages/Home';                  <span>#1</span>
+import ArticleList from './components/articles/ArticleList';
+import ArticleInfo from './components/articles/ArticleInfo';
+import ArticleAdd from './components/articles/ArticleAdd';
+import ArticleEdit from './components/articles/ArticleEdit';
+...
+function Main() {                                            <span>#2</span>
+  return(
+    &lt;Switch>                                                 <span>#3</span>
+      &lt;Route exact path="/" component={Home} />              <span>#4</span>
+      &lt;Route exact path="/articles" component={ArticleList} />
+      &lt;Route exact path="/articles/new" component={ArticleAdd} />
+      &lt;Route exact path="/articles/:_id" component={ArticleInfo} />
+      &lt;Route exact path="/articles/:_id/edit" component={ArticleEdit} />
+    &lt;/Switch>
+);
+</pre>
+<ol>
+<li>Import the components that you will be calling with your Routes. Each of those files will contain a component. Each of the articles components corresponds with one or more endpoints in our API.</li>
+<li>The <i>Main</i> component is where you insert all your Route elements.</li>
+<li>The React Router switch statement works like a JavaScript switch statement. It checks each statement below it in order until there is a match.</li>
+<li>Route is a React Router element that takes as attributes the path and the component to call if there is a match. The "exact" attribute requires the match be exact.</li>
+</ol>
+
+<hr class="space">
+<h3>GraphQL Queries and Mutations</h3>
+<p>When we built the GraphQL API, we tested it with queries and mutations to each of our endpoints using the graphql playground (if you used apollo-server) or graphiql tool (if you used express-graphql) in the browser. We'll send those same queries and mutations from our React client. Let's put them all in one file for convenience:</p>
+<div class="filename">src/graphql/articleQueries</div>
+<div class="highlight"><pre><span></span><span class="lineno"> 1 </span><span class="kr">import</span> <span class="p">{</span> <span class="nx">gql</span> <span class="p">}</span> <span class="nx">from</span> <span class="s1">&#39;apollo-boost&#39;</span><span class="p">;</span>
+<span class="lineno"> 2 </span>
+<span class="lineno"> 3 </span><span class="kr">const</span> <span class="nx">GET_ARTICLES</span> <span class="o">=</span> <span class="nx">gql</span><span class="sb">`</span>
+<span class="lineno"> 4 </span><span class="sb">  {</span>
+<span class="lineno"> 5 </span><span class="sb">    articles {</span>
+<span class="lineno"> 6 </span><span class="sb">      title</span>
+<span class="lineno"> 7 </span><span class="sb">      content</span>
+<span class="lineno"> 8 </span><span class="sb">      id</span>
+<span class="lineno"> 9 </span><span class="sb">    }</span>
+<span class="lineno">10 </span><span class="sb">  }</span>
+<span class="lineno">11 </span><span class="sb">`</span><span class="p">;</span>
+<span class="lineno">12 </span>
+<span class="lineno">13 </span><span class="kr">const</span> <span class="nx">GET_ARTICLE</span> <span class="o">=</span> <span class="nx">gql</span><span class="sb">`</span>
+<span class="lineno">14 </span><span class="sb">  query article($id: ID!) {</span>
+<span class="lineno">15 </span><span class="sb">    article(id: $id) {</span>
+<span class="lineno">16 </span><span class="sb">      id</span>
+<span class="lineno">17 </span><span class="sb">      title</span>
+<span class="lineno">18 </span><span class="sb">      content</span>
+<span class="lineno">19 </span><span class="sb">    }</span>
+<span class="lineno">20 </span><span class="sb">  }</span>
+<span class="lineno">21 </span><span class="sb">`</span><span class="p">;</span>
+<span class="lineno">22 </span>
+<span class="lineno">23 </span><span class="kr">const</span> <span class="nx">CREATE_ARTICLE</span> <span class="o">=</span> <span class="nx">gql</span><span class="sb">`</span>
+<span class="lineno">24 </span><span class="sb">  mutation createArticle($title: String!, $content: String!) {</span>
+<span class="lineno">25 </span><span class="sb">    createArticle(articleInput: { title: $title, content: $content }) {</span>
+<span class="lineno">26 </span><span class="sb">      title</span>
+<span class="lineno">27 </span><span class="sb">      content</span>
+<span class="lineno">28 </span><span class="sb">      id</span>
+<span class="lineno">29 </span><span class="sb">    }</span>
+<span class="lineno">30 </span><span class="sb">  }</span>
+<span class="lineno">31 </span><span class="sb">`</span><span class="p">;</span>
+<span class="lineno">32 </span>
+<span class="lineno">33 </span><span class="kr">const</span> <span class="nx">DELETE_ARTICLE</span> <span class="o">=</span> <span class="nx">gql</span><span class="sb">`</span>
+<span class="lineno">34 </span><span class="sb">  mutation deleteArticle($id: ID!) {</span>
+<span class="lineno">35 </span><span class="sb">    deleteArticle(id: $id) {</span>
+<span class="lineno">36 </span><span class="sb">      title</span>
+<span class="lineno">37 </span><span class="sb">      content</span>
+<span class="lineno">38 </span><span class="sb">      id</span>
+<span class="lineno">39 </span><span class="sb">    }</span>
+<span class="lineno">40 </span><span class="sb">  }</span>
+<span class="lineno">41 </span><span class="sb">`</span><span class="p">;</span>
+<span class="lineno">42 </span>
+<span class="linenum">1. </span><span class="kr">const</span> <span class="nx">UPDATE_ARTICLE</span> <span class="o">=</span> <span class="nx">gql</span><span class="sb">` </span>
+<span class="linenum">2. </span><span class="sb">  mutation updateArticle($id: ID!, $title: String!, $content: String!) {     </span>
+<span class="linenum">3. </span><span class="sb">    updateArticle(id: $id, articleInput: { title: $title, content: $content }) { </span>
+<span class="linenum">4. </span><span class="sb">      id</span>
+<span class="lineno">47 </span><span class="sb">      title</span>
+<span class="lineno">48 </span><span class="sb">      content</span>
+<span class="lineno">49 </span><span class="sb">    }</span>
+<span class="lineno">50 </span><span class="sb">  }</span>
+<span class="lineno">51 </span><span class="sb">`</span><span class="p">;</span>
+<span class="lineno">52 </span>
+<span class="lineno">53 </span><span class="kr">export</span> <span class="p">{</span> <span class="nx">GET_ARTICLES</span><span class="p">,</span> <span class="nx">GET_ARTICLE</span><span class="p">,</span> <span class="nx">CREATE_ARTICLE</span><span class="p">,</span> <span class="nx">DELETE_ARTICLE</span><span class="p">,</span> <span class="nx">UPDATE_ARTICLE</span> <span class="p">};</span>
+</pre></div>
+<p>We have one query or mutation string per endpoint on our API. I won't go through each of these individually but rather go over the structure using UPDATE_ARTICLE as an example from the inside out.</p>
+<ol>
+<li>Each query or mutation string is wrapped with in a gql function imported from apollo-boost. We are assigning them to constants in all caps which is the format Apollo recommends.</li>
+<li>Tell the GraphQL API whether this is a Query or Mutation (or Subscription, or a custom type). Start by filtering the variables we are passing in to check their type and whether any required fields are missing. In this case case the variables are ID type and String type. The ! means the field is required.</li>
+<li>Now pass in the tested variables to the function that gets sent to the API. The name of each query/mutation and arguments align with the resolver function names and arguments on the API.</li>
+<li>List the properties you want returned back from the API, in this case we want id, title, and content.</li>
+</ol>
+
+<hr class="space">
+<h4>ArticleList component</h4>
+<p>In our app's navbar is a link to "articles" which loads our ArticleList component. Let's populate it.</p>
+
+<div class="filename">src/components/articles/ArticleList.js</div>
+<div class="highlight"><pre><span></span><span class="lineno"> 1 </span><span class="kr">import</span> <span class="nx">React</span> <span class="nx">from</span> <span class="s1">&#39;react&#39;</span><span class="p">;</span>
+<span class="lineno"> 2 </span><span class="kr">import</span> <span class="p">{</span> <span class="nx">Link</span> <span class="p">}</span> <span class="nx">from</span> <span class="s1">&#39;react-router-dom&#39;</span><span class="p">;</span>
+<span class="lineno"> 3 </span><span class="kr">import</span> <span class="p">{</span> <span class="nx">Query</span> <span class="p">}</span> <span class="nx">from</span> <span class="s1">&#39;react-apollo&#39;</span><span class="p">;</span>
+<span class="lineno"> 4 </span><span class="kr">import</span> <span class="p">{</span> <span class="nx">GET_ARTICLES</span> <span class="p">}</span> <span class="nx">from</span> <span class="s1">&#39;../../graphql/articleQueries&#39;</span><span class="p">;</span>
+<span class="lineno"> 5 </span>
+<span class="lineno"> 6 </span><span class="kd">function</span> <span class="nx">ArticleList</span><span class="p">()</span> <span class="p">{</span>
+<span class="lineno"> 7 </span>  <span class="k">return</span><span class="p">(</span>
+<span class="lineno"> 8 </span>    <span class="o">&lt;</span><span class="nx">div</span><span class="o">&gt;</span>
+<span class="lineno"> 9 </span>      <span class="o">&lt;</span><span class="nx">h2</span><span class="o">&gt;</span>
+<span class="lineno">10 </span>        <span class="nx">Articles</span>
+<span class="linenum">1. </span>        <span class="o">&lt;</span><span class="nx">Link</span> <span class="nx">to</span><span class="o">=</span><span class="s2">&quot;/articles/new&quot;</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;btn btn-primary float-right&quot;</span><span class="o">&gt;</span> 
+<span class="lineno">12 </span>          <span class="nx">Create</span> <span class="nx">Article</span>
+<span class="lineno">13 </span>        <span class="o">&lt;</span><span class="err">/Link&gt; </span>
+<span class="lineno">14 </span>      <span class="o">&lt;</span><span class="err">/h2&gt;</span>
+<span class="linenum">2. </span>      <span class="o">&lt;</span><span class="nx">Query</span> <span class="nx">query</span><span class="o">=</span><span class="p">{</span><span class="nx">GET_ARTICLES</span><span class="p">}</span><span class="o">&gt;</span> 
+<span class="linenum">3. </span>        <span class="p">{</span><span class="kd">function</span><span class="p">({</span> <span class="nx">loading</span><span class="p">,</span> <span class="nx">error</span><span class="p">,</span> <span class="nx">data</span> <span class="p">})</span> <span class="p">{</span> 
+<span class="lineno">17 </span>          <span class="k">if</span> <span class="p">(</span><span class="nx">loading</span><span class="p">)</span> <span class="k">return</span> <span class="s2">&quot;Loading...&quot;</span><span class="p">;</span>
+<span class="lineno">18 </span>          <span class="k">if</span> <span class="p">(</span><span class="nx">error</span><span class="p">)</span> <span class="k">return</span> <span class="sb">`Error! </span><span class="cp">${</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="cp">}</span><span class="sb">`</span><span class="p">;</span>
+<span class="linenum">4. </span>          <span class="kr">const</span> <span class="p">{</span> <span class="nx">articles</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">data</span><span class="p">;</span> 
+<span class="lineno">20 </span>          <span class="k">return</span> <span class="p">(</span>
+<span class="linenum">5. </span>            <span class="nx">articles</span><span class="p">.</span><span class="nx">map</span><span class="p">(</span><span class="kd">function</span><span class="p">(</span><span class="nx">article</span><span class="p">)</span> <span class="p">{</span> 
+<span class="lineno">22 </span>              <span class="k">return</span><span class="p">(</span>
+<span class="linenum">6. </span>                <span class="o">&lt;</span><span class="nx">div</span> <span class="nx">key</span><span class="o">=</span><span class="p">{</span><span class="nx">article</span><span class="p">.</span><span class="nx">id</span><span class="p">}</span><span class="o">&gt;</span> 
+<span class="lineno">24 </span>                  <span class="o">&lt;</span><span class="nx">hr</span><span class="o">/&gt;</span>
+<span class="lineno">25 </span>                  <span class="o">&lt;</span><span class="nx">h4</span><span class="o">&gt;&lt;</span><span class="nx">Link</span> <span class="nx">to</span><span class="o">=</span><span class="p">{</span><span class="sb">`/articles/</span><span class="cp">${</span><span class="n">article</span><span class="o">.</span><span class="n">id</span><span class="cp">}</span><span class="sb">`</span><span class="p">}</span><span class="o">&gt;</span><span class="p">{</span><span class="nx">article</span><span class="p">.</span><span class="nx">title</span><span class="p">}</span><span class="o">&lt;</span><span class="err">/Link&gt;&lt;/h4&gt;</span>
+<span class="lineno">26 </span>                  <span class="o">&lt;</span><span class="nx">small</span><span class="o">&gt;</span><span class="nx">id</span><span class="o">:</span> <span class="p">{</span><span class="nx">article</span><span class="p">.</span><span class="nx">id</span><span class="p">}</span><span class="o">&lt;</span><span class="err">/small&gt;</span>
+<span class="lineno">27 </span>                <span class="o">&lt;</span><span class="err">/div&gt;</span>
+<span class="lineno">28 </span>              <span class="p">)</span>     
+<span class="lineno">29 </span>            <span class="p">})</span>
+<span class="lineno">30 </span>          <span class="p">);</span>
+<span class="lineno">31 </span>        <span class="p">}}</span>
+<span class="lineno">32 </span>      <span class="o">&lt;</span><span class="err">/Query&gt;</span>
+<span class="lineno">33 </span>    <span class="o">&lt;</span><span class="err">/div&gt;</span>
+<span class="lineno">34 </span>  <span class="p">)</span>
+<span class="lineno">35 </span><span class="p">}</span>
+<span class="lineno">36 </span>
+<span class="lineno">37 </span><span class="kr">export</span> <span class="k">default</span> <span class="nx">ArticleList</span><span class="p">;</span>
+</pre></div>
+<ol>
+<li>We imported the Link component from react-router-dom to go to the articles/new route. And in our articles list, each article name has a link to the articles/:id route.</li>
+<li>We imported a react-apollo component called Query that we are using here. We also imported the GET_ARTICLES query defined in the graphql/articleQueries file and are passing it in as props. Apollo will handle the sending and retrieving of the data to and from the API. If we were to do it ourselves we would send a fetch query or use the Axios package and wait for then handle the response.</li>
+<li>Apollo can provide different states for loading, error response, or data from a successful response.</li>
+<li>Unpacking the articles array from the data response object makes it a little easier to work with. Data is similar to working with props or state in standard React.</li>
+<li>We'll use the JavaScript map function to return each article object displayed how we like. In this case with the article title that links to the article, and the article id just to help us in development.</li>
+<li>In React, when you iterate over an array of objects like we are here, you need to assign a unique key to each one. We have the id field for each article so we'll use that.</li>
+</ol>
+<p class='mt-3'>Now let's test it out. Make sure the API server is running. Open another window and go to the project's root directory. Then run:</p>
+<li class="dlr"><code>nodemon</code></li>
+<p class='mt-3 mb-1'>Your API server should now be running on localhost:4000. If you are using a local version of MongoDB also make sure that is running in a separate window (<code>mongod</code>). You may need to restart your Client server. Go back to the window running the React app. Stop the server with <code>CTRL+C</code>. Then run:</p>
+<li class="dlr"><code>yarn start</code></li>
+<p>And now your front end React app should be running on localhost:3000 and should be displaying the articles saved to your database.</p>
+
+
+<hr class="space">
+<h4>ArticleInfo component</h4>
+<p>On the articles page in your browser if you click on an article title it should take you to the /articles/:id route and the ArticleInfo component. It will be empty because we haven't entered any code yet. So let's do that now:</p>
+
+<div class="filename">src/components/articles/ArticleInfo.js</div>
+<div class="highlight"><pre><span></span><span class="lineno"> 1 </span><span class="kr">import</span> <span class="nx">React</span> <span class="nx">from</span> <span class="s1">&#39;react&#39;</span><span class="p">;</span>
+<span class="lineno"> 2 </span><span class="kr">import</span> <span class="p">{</span> <span class="nx">Link</span> <span class="p">}</span> <span class="nx">from</span> <span class="s1">&#39;react-router-dom&#39;</span><span class="p">;</span>
+<span class="lineno"> 3 </span><span class="kr">import</span> <span class="p">{</span> <span class="nx">Query</span><span class="p">,</span> <span class="nx">Mutation</span> <span class="p">}</span> <span class="nx">from</span> <span class="s1">&#39;react-apollo&#39;</span><span class="p">;</span>
+<span class="lineno"> 4 </span><span class="kr">import</span> <span class="p">{</span> <span class="nx">GET_ARTICLE</span><span class="p">,</span> <span class="nx">DELETE_ARTICLE</span><span class="p">,</span> <span class="nx">GET_ARTICLES</span> <span class="p">}</span> <span class="nx">from</span> <span class="s1">&#39;../../graphql/articleQueries&#39;</span><span class="p">;</span>
+<span class="lineno"> 5 </span>
+<span class="lineno"> 6 </span><span class="kd">function</span> <span class="nx">ArticleInfo</span><span class="p">(</span><span class="nx">props</span><span class="p">)</span> <span class="p">{</span>
+<span class="lineno"> 7 </span>  <span class="k">return</span> <span class="p">(</span>
+<span class="linenum">1. </span>    <span class="o">&lt;</span><span class="nx">Query</span> <span class="nx">query</span><span class="o">=</span><span class="p">{</span><span class="nx">GET_ARTICLE</span><span class="p">}</span> <span class="nx">variables</span><span class="o">=</span><span class="p">{{</span> <span class="nx">id</span><span class="o">:</span> <span class="nx">props</span><span class="p">.</span><span class="nx">match</span><span class="p">.</span><span class="nx">params</span><span class="p">.</span><span class="nx">_id</span> <span class="p">}}</span><span class="o">&gt;</span>  
+<span class="lineno"> 9 </span>      <span class="p">{</span><span class="kd">function</span><span class="p">({</span> <span class="nx">loading</span><span class="p">,</span> <span class="nx">error</span><span class="p">,</span> <span class="nx">data</span> <span class="p">})</span> <span class="p">{</span>
+<span class="lineno">10 </span>        <span class="k">if</span> <span class="p">(</span><span class="nx">loading</span><span class="p">)</span> <span class="k">return</span> <span class="s2">&quot;Loading...&quot;</span><span class="p">;</span>
+<span class="lineno">11 </span>        <span class="k">if</span> <span class="p">(</span><span class="nx">error</span><span class="p">)</span> <span class="k">return</span> <span class="sb">`Error! </span><span class="cp">${</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="cp">}</span><span class="sb">`</span><span class="p">;</span>
+<span class="lineno">12 </span>        <span class="kr">const</span> <span class="p">{</span> <span class="nx">article</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">data</span><span class="p">;</span>
+<span class="lineno">13 </span>        <span class="k">return</span> <span class="p">(</span>
+<span class="lineno">14 </span>          <span class="o">&lt;</span><span class="nx">div</span><span class="o">&gt;</span>
+<span class="lineno">15 </span>            <span class="o">&lt;</span><span class="nx">h2</span><span class="o">&gt;</span><span class="p">{</span><span class="nx">article</span><span class="p">.</span><span class="nx">title</span><span class="p">}</span><span class="o">&lt;</span><span class="err">/h2&gt;</span>
+<span class="lineno">16 </span>            <span class="o">&lt;</span><span class="nx">small</span><span class="o">&gt;</span><span class="nx">id</span><span class="o">:</span> <span class="p">{</span><span class="nx">article</span><span class="p">.</span><span class="nx">id</span><span class="p">}</span><span class="o">&lt;</span><span class="err">/small&gt;</span>
+<span class="lineno">17 </span>            <span class="o">&lt;</span><span class="nx">p</span><span class="o">&gt;</span><span class="p">{</span><span class="nx">article</span><span class="p">.</span><span class="nx">content</span><span class="p">}</span><span class="o">&lt;</span><span class="err">/p&gt;</span>
+<span class="lineno">18 </span>            <span class="o">&lt;</span><span class="nx">p</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;btn-group&quot;</span><span class="o">&gt;</span>
+<span class="lineno">19 </span>              <span class="o">&lt;</span><span class="nx">Link</span> <span class="nx">to</span><span class="o">=</span><span class="p">{</span><span class="sb">`/articles/</span><span class="cp">${</span><span class="n">article</span><span class="o">.</span><span class="n">id</span><span class="cp">}</span><span class="sb">/edit`</span><span class="p">}</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;btn btn-info&quot;</span><span class="o">&gt;</span><span class="nx">Edit</span><span class="o">&lt;</span><span class="err">/Link&gt; </span>
+<span class="linenum">2. </span>              <span class="o">&lt;</span><span class="nx">Mutation</span> <span class="nx">mutation</span><span class="o">=</span><span class="p">{</span><span class="nx">DELETE_ARTICLE</span><span class="p">}</span> <span class="o">&gt;</span> 
+<span class="linenum">3. </span>                <span class="p">{</span><span class="kd">function</span><span class="p">(</span><span class="nx">deleteArticle</span><span class="p">,</span> <span class="p">{</span> <span class="nx">data</span> <span class="p">})</span> <span class="p">{</span> 
+<span class="lineno">22 </span>                  <span class="k">return</span><span class="p">(</span>
+<span class="lineno">23 </span>                    <span class="o">&lt;</span><span class="nx">button</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;btn btn-danger&quot;</span>
+<span class="linenum">4. </span>                      <span class="nx">onClick</span><span class="o">=</span><span class="p">{()</span> <span class="o">=&gt;</span> <span class="p">{</span> 
+<span class="linenum">5. </span>                        <span class="nx">deleteArticle</span><span class="p">({</span> 
+<span class="linenum">6. </span>                          <span class="nx">variables</span><span class="o">:</span> <span class="p">{</span> <span class="nx">id</span><span class="o">:</span> <span class="nx">article</span><span class="p">.</span><span class="nx">id</span> <span class="p">},</span> 
+<span class="linenum">7. </span>                          <span class="nx">refetchQueries</span><span class="o">:</span> <span class="p">[{</span><span class="nx">query</span><span class="o">:</span> <span class="nx">GET_ARTICLES</span><span class="p">}]</span> 
+<span class="lineno">28 </span>                        <span class="p">});</span>
+<span class="linenum">8. </span>                        <span class="nx">props</span><span class="p">.</span><span class="nx">history</span><span class="p">.</span><span class="nx">push</span><span class="p">(</span><span class="s2">&quot;/articles&quot;</span><span class="p">);</span> 
+<span class="lineno">30 </span>                      <span class="p">}}</span>
+<span class="lineno">31 </span>                    <span class="o">&gt;</span>
+<span class="lineno">32 </span>                      <span class="nx">Delete</span>
+<span class="lineno">33 </span>                    <span class="o">&lt;</span><span class="err">/button&gt; </span>
+<span class="lineno">34 </span>                  <span class="p">)</span>
+<span class="lineno">35 </span>                <span class="p">}}</span>
+<span class="lineno">36 </span>              <span class="o">&lt;</span><span class="err">/Mutation&gt;</span>
+<span class="lineno">37 </span>              <span class="o">&lt;</span><span class="nx">Link</span> <span class="nx">to</span><span class="o">=</span><span class="s2">&quot;/articles&quot;</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;btn btn-secondary&quot;</span><span class="o">&gt;</span><span class="nx">Close</span><span class="o">&lt;</span><span class="err">/Link&gt;</span>
+<span class="lineno">38 </span>            <span class="o">&lt;</span><span class="err">/p&gt;</span>
+<span class="lineno">39 </span>            <span class="o">&lt;</span><span class="nx">hr</span><span class="o">/&gt;</span>
+<span class="lineno">40 </span>          <span class="o">&lt;</span><span class="err">/div&gt;</span>
+<span class="lineno">41 </span>        <span class="p">);</span>
+<span class="lineno">42 </span>      <span class="p">}}</span>
+<span class="lineno">43 </span>    <span class="o">&lt;</span><span class="err">/Query&gt;</span>
+<span class="lineno">44 </span>  <span class="p">)</span>
+<span class="lineno">45 </span><span class="p">}</span>
+<span class="lineno">46 </span>
+<span class="lineno">47 </span><span class="kr">export</span> <span class="k">default</span> <span class="nx">ArticleInfo</span>
+</pre></div>
+
+<ol>
+<li>This is similar to ArticlesList in that we import a Query component from react-apollo and pass a query string we imported from the graphql/articleQueries file as the query property. But this time we also include the variables object and pass in an id property. We get that from a React object called props. Props.match.params._id will pull the _id value from the url. MongoDB calls it's autogenerated id field _id, which technically follows a JavaScript convention around private property names.</li>
+</ol>
+<p class='ml-4 my-2'>Now let's dig into mutations. On the article page we will have a button to delete the article. When the user presses the button we need to send the deleteArticle mutation to the GraphQL API with the article.id property. We imported the Mutation component from react-apollo. <br>
+In the graphql/articleQueries file we created a GraphQL mutation string calling deleteArticle, wrapped it with a gql function, assigned it to the DELETE_ARTICLE constant, and imported it to our current ArticleInfo component.</p>
+<ol start="2">
+<li>To create a Mutation component we must pass the mutation string as a mutation property.</li>
+<li>We must also provide a function to the props.children that tells React what to render. In this case it is the delete button.</li>
+<li>We are putting the onClick handler function directly in the button component.</li>
+<li>It calls deleteArticles taking an object as its argument.</li>
+<li>The first property is any variables we want to pass to the API endpoint. In this case we are passing the article.id.</li>
+<li>The second property we are adding is refetchQueries. When we delete the article we want it removed from our articles list. The easiest way to do that is just to call a new query. You could also modify the cached articles array which would avoid another API call. To do that, replace statement 7 with the below. This uses the <a href="https://www.apollographql.com/docs/react/essentials/mutations/#updating-the-cache">Apollo update function</a>.</li>
+<pre>
+update(cache, { data: { createArticle } }) {
+  const { articles } = cache.readQuery({ query: GET_ARTICLES });
+  cache.writeQuery({
+    query: GET_ARTICLES,
+    data: { articles: articles.filter(a => (a.id !== article.id)) },
+  });
+}
+</pre>
+<li>Finally we redirect to the articles page.</li>
+</ol>
+<p class='mt-3'>Try viewing and deleting an article in the browser. We'll cover creating an article next. You can add back articles using the GraphQL playground at localhost:4000 (if using apollo-server) or the Graphiql tool in the browser at localhost:4000/graphql (if using express-graphql).</p>
+<pre>
+mutation {
+  createArticle(articleInput: { title: "Learn React", content: "Lorem Ipsum."}) {
+    id, title, content
+  }
+}
+</pre>
+
+<hr class="space">
+<h4>ArticleAdd component</h4>
+<p>On the articles page in your browser there is a button that will take you to the /articles/new route and the ArticleAdd component. This displays a form to create a new article.</p>
+
+<div class="filename">src/components/articles/ArticleAdd.js</div>
+<div class="highlight"><pre><span></span><span class="lineno"> 1 </span><span class="kr">import</span> <span class="nx">React</span> <span class="nx">from</span> <span class="s1">&#39;react&#39;</span><span class="p">;</span>
+<span class="lineno"> 2 </span><span class="kr">import</span> <span class="p">{</span> <span class="nx">Link</span> <span class="p">}</span> <span class="nx">from</span> <span class="s1">&#39;react-router-dom&#39;</span><span class="p">;</span>
+<span class="lineno"> 3 </span><span class="kr">import</span> <span class="p">{</span> <span class="nx">Mutation</span> <span class="p">}</span> <span class="nx">from</span> <span class="s1">&#39;react-apollo&#39;</span><span class="p">;</span>
+<span class="linenum">1. </span><span class="kr">import</span> <span class="p">{</span> <span class="nx">CREATE_ARTICLE</span><span class="p">,</span> <span class="nx">GET_ARTICLES</span> <span class="p">}</span> <span class="nx">from</span> <span class="s1">&#39;../../graphql/articleQueries&#39;</span><span class="p">;</span> 
+<span class="lineno"> 5 </span>
+<span class="lineno"> 6 </span><span class="kd">function</span> <span class="nx">ArticleAdd</span><span class="p">(</span><span class="nx">props</span><span class="p">)</span> <span class="p">{</span>
+<span class="lineno"> 7 </span>  <span class="kd">let</span> <span class="nx">title</span><span class="p">,</span> <span class="nx">content</span><span class="p">;</span>
+<span class="lineno"> 8 </span>
+<span class="lineno"> 9 </span>  <span class="k">return</span> <span class="p">(</span>
+<span class="linenum">2. </span>    <span class="o">&lt;</span><span class="nx">Mutation</span> <span class="nx">mutation</span><span class="o">=</span><span class="p">{</span><span class="nx">CREATE_ARTICLE</span><span class="p">}</span><span class="o">&gt;</span> 
+<span class="linenum">3. </span>      <span class="p">{</span><span class="kd">function</span><span class="p">(</span><span class="nx">createArticle</span><span class="p">,</span> <span class="p">{</span> <span class="nx">data</span> <span class="p">})</span> <span class="p">{</span> 
+<span class="linenum">4. </span>        <span class="k">return</span><span class="p">(</span> 
+<span class="lineno">13 </span>          <span class="o">&lt;</span><span class="nx">div</span><span class="o">&gt;</span>
+<span class="lineno">14 </span>            <span class="o">&lt;</span><span class="nx">h4</span><span class="o">&gt;</span><span class="nx">Add</span> <span class="nx">Article</span><span class="o">&lt;</span><span class="sr">/h4&gt;&lt;hr/</span><span class="o">&gt;</span>
+<span class="lineno">15 </span>            <span class="o">&lt;</span><span class="nx">form</span>
+<span class="linenum">5. </span>              <span class="nx">onSubmit</span><span class="o">=</span><span class="p">{</span><span class="kd">function</span><span class="p">(</span><span class="nx">event</span><span class="p">)</span> <span class="p">{</span> 
+<span class="linenum">6. </span>                <span class="nx">event</span><span class="p">.</span><span class="nx">preventDefault</span><span class="p">();</span> 
+<span class="linenum">7. </span>                <span class="nx">createArticle</span><span class="p">({</span>
+<span class="linenum">8. </span>                  <span class="nx">variables</span><span class="o">:</span> <span class="p">{</span> <span class="nx">title</span><span class="o">:</span> <span class="nx">title</span><span class="p">.</span><span class="nx">value</span><span class="p">,</span> <span class="nx">content</span><span class="o">:</span> <span class="nx">content</span><span class="p">.</span><span class="nx">value</span> <span class="p">},</span> 
+<span class="linenum">9. </span>                  <span class="nx">refetchQueries</span><span class="o">:</span> <span class="p">[{</span><span class="nx">query</span><span class="o">:</span> <span class="nx">GET_ARTICLES</span><span class="p">}]</span> 
+<span class="lineno">20 </span>                <span class="p">});</span>
+<span class="linenum">10.</span>                <span class="nx">props</span><span class="p">.</span><span class="nx">history</span><span class="p">.</span><span class="nx">push</span><span class="p">(</span><span class="s2">&quot;/articles&quot;</span><span class="p">);</span> 
+<span class="lineno">22 </span>              <span class="p">}}</span>
+<span class="lineno">23 </span>            <span class="o">&gt;</span>
+<span class="lineno">24 </span>              <span class="o">&lt;</span><span class="nx">div</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;form-group&quot;</span><span class="o">&gt;</span>
+<span class="lineno">25 </span>                <span class="o">&lt;</span><span class="nx">label</span><span class="o">&gt;</span><span class="nx">Title</span><span class="o">:&lt;</span><span class="err">/label&gt;</span>
+<span class="lineno">26 </span>                <span class="o">&lt;</span><span class="nx">input</span> <span class="nx">type</span><span class="o">=</span><span class="s2">&quot;text&quot;</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;form-control&quot;</span> 
+<span class="linenum">11.</span>                  <span class="nx">ref</span><span class="o">=</span><span class="p">{</span><span class="kd">function</span><span class="p">(</span><span class="nx">node</span><span class="p">)</span> <span class="p">{</span> <span class="k">return</span> <span class="nx">title</span> <span class="o">=</span> <span class="nx">node</span><span class="p">;</span> <span class="p">}}</span> 
+<span class="lineno">28 </span>                <span class="o">/&gt;</span>              
+<span class="lineno">29 </span>              <span class="o">&lt;</span><span class="err">/div&gt;</span>
+<span class="lineno">30 </span>              <span class="o">&lt;</span><span class="nx">div</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;form-group&quot;</span><span class="o">&gt;</span>
+<span class="lineno">31 </span>                <span class="o">&lt;</span><span class="nx">label</span><span class="o">&gt;</span><span class="nx">Content</span><span class="o">:&lt;</span><span class="err">/label&gt;</span>
+<span class="lineno">32 </span>                <span class="o">&lt;</span><span class="nx">textarea</span> <span class="nx">rows</span><span class="o">=</span><span class="s2">&quot;5&quot;</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;form-control&quot;</span>
+<span class="lineno">33 </span>                  <span class="nx">ref</span><span class="o">=</span><span class="p">{</span><span class="kd">function</span><span class="p">(</span><span class="nx">node</span><span class="p">)</span> <span class="p">{</span> <span class="k">return</span> <span class="nx">content</span> <span class="o">=</span> <span class="nx">node</span><span class="p">;</span> <span class="p">}}</span> 
+<span class="lineno">34 </span>                <span class="o">/&gt;</span>
+<span class="lineno">35 </span>              <span class="o">&lt;</span><span class="err">/div&gt;</span>
+<span class="lineno">36 </span>              <span class="o">&lt;</span><span class="nx">p</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;btn-group&quot;</span><span class="o">&gt;</span>
+<span class="lineno">37 </span>                <span class="o">&lt;</span><span class="nx">button</span> <span class="nx">type</span><span class="o">=</span><span class="s2">&quot;submit&quot;</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;btn btn-primary&quot;</span><span class="o">&gt;</span><span class="nx">Submit</span><span class="o">&lt;</span><span class="err">/button&gt;</span>
+<span class="lineno">38 </span>               <span class="o">&lt;</span><span class="nx">Link</span> <span class="nx">to</span><span class="o">=</span><span class="s2">&quot;/articles&quot;</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;btn btn-secondary&quot;</span><span class="o">&gt;</span><span class="nx">Cancel</span><span class="o">&lt;</span><span class="err">/Link&gt;</span>
+<span class="lineno">39 </span>              <span class="o">&lt;</span><span class="err">/p&gt;</span>
+<span class="lineno">40 </span>            <span class="o">&lt;</span><span class="err">/form&gt;</span>
+<span class="lineno">41 </span>          <span class="o">&lt;</span><span class="err">/div&gt;</span>
+<span class="lineno">42 </span>        <span class="p">)}</span>
+<span class="lineno">43 </span>      <span class="p">}</span>
+<span class="lineno">44 </span>    <span class="o">&lt;</span><span class="err">/Mutation&gt;</span>
+<span class="lineno">45 </span>  <span class="p">);</span>
+<span class="lineno">46 </span><span class="p">};</span>
+<span class="lineno">47 </span>
+<span class="lineno">48 </span><span class="kr">export</span> <span class="k">default</span> <span class="nx">ArticleAdd</span><span class="p">;</span>
+</pre></div>
+
+<ol>
+<li>We will be using the mutation and query strings assigned to CREATE_ARTICLE and GET_ARTICLES.</li>
+<li>Creating an article is a write action so we will use a Mutation component imported from the react-apollo library. And we will pass the mutation defined in CREATE_ARTICLE.</li>
+<li>The Mutation component requires a function that takes the endpoint name and data being submitted as arguments.</li>
+<li>The function returns the JSX that React will render.</li>
+<li>We are putting the onSubmit handler function directly in the form element.</li>
+<li>As with standard AJAX form submissions, we need to prevent the default behavior when a form is submitted.</li>
+<li>It calls createArticle taking an object as its argument.</li>
+<li>The first property are the variables we want to pass to the API endpoint. In this case we are passing the values from the form fields.</li>
+<li>The second property we are adding is refetchQueries. When we add the article we want it added to our articles list. The easiest way to do that is just to call a new query. Alternatively you could modify the cached articles array to avoid another API call. To do that replace statement 9 with the below code:</li>
+<pre>
+update(cache, { data: { createArticle } }) {
+  const { articles } = cache.readQuery({ query: GET_ARTICLES });
+  cache.writeQuery({
+    query: GET_ARTICLES,
+    data: { articles: articles.concat([createArticle]) },
+  });
+}
+</pre>
+<li>Finally we redirect to the articles page.</li>
+<li>The React input element is a DOM node. To access it's content we are using the React ref property.</li>
+</ol>
+<p class='mt-3'>Test it out by adding an article in the browser.</p>
+
+<hr class="space">
+<h4>ArticleEdit component</h4>
+<p>We are now on the last component in our React front end, the edit page to Update an existing article in the database. On the article info page in your browser there is an Edit button that will take you to the /articles/:id/edit route and the ArticleEdit component. This is another form like ArticleAdd, but we need to populate it with the article's existing values.</p>
+
+<div class="filename">src/components/articles/ArticleEdit.js</div>
+<div class="highlight"><pre><span></span><span class="lineno"> 1 </span><span class="kr">import</span> <span class="nx">React</span> <span class="nx">from</span> <span class="s1">&#39;react&#39;</span><span class="p">;</span>
+<span class="lineno"> 2 </span><span class="kr">import</span> <span class="p">{</span> <span class="nx">Query</span><span class="p">,</span> <span class="nx">Mutation</span> <span class="p">}</span> <span class="nx">from</span> <span class="s1">&#39;react-apollo&#39;</span><span class="p">;</span>
+<span class="lineno"> 3 </span><span class="kr">import</span> <span class="p">{</span> <span class="nx">GET_ARTICLE</span><span class="p">,</span> <span class="nx">UPDATE_ARTICLE</span> <span class="p">}</span> <span class="nx">from</span> <span class="s1">&#39;../../graphql/articleQueries&#39;</span><span class="p">;</span>
+<span class="lineno"> 4 </span>
+<span class="lineno"> 5 </span><span class="kd">function</span> <span class="nx">ArticleEdit</span><span class="p">(</span><span class="nx">props</span><span class="p">)</span> <span class="p">{</span>
+<span class="lineno"> 6 </span>  <span class="kd">function</span> <span class="nx">handleCancel</span><span class="p">(</span><span class="nx">id</span><span class="p">)</span> <span class="p">{</span>
+<span class="lineno"> 7 </span>    <span class="nx">props</span><span class="p">.</span><span class="nx">history</span><span class="p">.</span><span class="nx">push</span><span class="p">(</span><span class="sb">`/articles/</span><span class="cp">${</span><span class="nb">id</span><span class="cp">}</span><span class="sb">`</span><span class="p">);</span>
+<span class="lineno"> 8 </span>  <span class="p">}</span>
+<span class="lineno"> 9 </span>
+<span class="lineno">10 </span>  <span class="kd">let</span> <span class="nx">title</span><span class="p">,</span> <span class="nx">content</span><span class="p">;</span>
+<span class="lineno">11 </span>  <span class="k">return</span> <span class="p">(</span>
+<span class="lineno">12 </span>    <span class="o">&lt;</span><span class="nx">Query</span> <span class="nx">query</span><span class="o">=</span><span class="p">{</span><span class="nx">GET_ARTICLE</span><span class="p">}</span> <span class="nx">variables</span><span class="o">=</span><span class="p">{{</span> <span class="nx">id</span><span class="o">:</span> <span class="nx">props</span><span class="p">.</span><span class="nx">match</span><span class="p">.</span><span class="nx">params</span><span class="p">.</span><span class="nx">_id</span> <span class="p">}}</span><span class="o">&gt;</span>
+<span class="linenum">1a.</span>      <span class="p">{</span><span class="kd">function</span><span class="p">({</span> <span class="nx">loading</span><span class="p">,</span> <span class="nx">error</span><span class="p">,</span> <span class="nx">data</span> <span class="p">})</span> <span class="p">{</span>
+<span class="lineno">14 </span>        <span class="k">if</span> <span class="p">(</span><span class="nx">loading</span><span class="p">)</span> <span class="k">return</span> <span class="s2">&quot;Loading...&quot;</span><span class="p">;</span>
+<span class="lineno">15 </span>        <span class="k">if</span> <span class="p">(</span><span class="nx">error</span><span class="p">)</span> <span class="k">return</span> <span class="sb">`Error! </span><span class="cp">${</span><span class="n">error</span><span class="o">.</span><span class="n">message</span><span class="cp">}</span><span class="sb">`</span><span class="p">;</span>
+<span class="lineno">16 </span>        <span class="kr">const</span> <span class="p">{</span> <span class="nx">article</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">data</span><span class="p">;</span>
+<span class="lineno">17 </span>        <span class="k">return</span> <span class="p">(</span>
+<span class="lineno">18 </span>          <span class="o">&lt;</span><span class="nx">div</span><span class="o">&gt;</span>
+<span class="lineno">19 </span>            <span class="o">&lt;</span><span class="nx">h1</span><span class="o">&gt;</span><span class="nx">Edit</span> <span class="p">{</span><span class="nx">article</span><span class="p">.</span><span class="nx">title</span><span class="p">}</span><span class="o">&lt;</span><span class="err">/h1&gt;</span>
+<span class="lineno">20 </span>            <span class="o">&lt;</span><span class="nx">Mutation</span> <span class="nx">mutation</span><span class="o">=</span><span class="p">{</span><span class="nx">UPDATE_ARTICLE</span><span class="p">}</span><span class="o">&gt;</span>
+<span class="linenum">1b.</span>              <span class="p">{</span><span class="kd">function</span><span class="p">(</span><span class="nx">updateArticle</span><span class="p">,</span> <span class="p">{</span> <span class="nx">loading</span><span class="p">,</span> <span class="nx">error</span> <span class="p">})</span> <span class="p">{</span> 
+<span class="lineno">22 </span>                <span class="k">return</span><span class="p">(</span> 
+<span class="lineno">23 </span>                  <span class="o">&lt;</span><span class="nx">div</span><span class="o">&gt;</span>
+<span class="lineno">24 </span>                    <span class="o">&lt;</span><span class="nx">form</span>
+<span class="lineno">25 </span>                      <span class="nx">onSubmit</span><span class="o">=</span><span class="p">{</span><span class="kd">function</span><span class="p">(</span><span class="nx">event</span><span class="p">)</span> <span class="p">{</span>
+<span class="lineno">26 </span>                        <span class="nx">event</span><span class="p">.</span><span class="nx">preventDefault</span><span class="p">();</span>
+<span class="linenum">2. </span>                        <span class="nx">updateArticle</span><span class="p">({</span> 
+<span class="lineno">28 </span>                          <span class="nx">variables</span><span class="o">:</span> <span class="p">{</span>
+<span class="lineno">29 </span>                            <span class="nx">id</span><span class="o">:</span> <span class="nx">article</span><span class="p">.</span><span class="nx">id</span><span class="p">,</span>
+<span class="lineno">30 </span>                            <span class="nx">title</span><span class="o">:</span> <span class="nx">title</span><span class="p">.</span><span class="nx">value</span><span class="p">,</span>
+<span class="lineno">31 </span>                            <span class="nx">content</span><span class="o">:</span> <span class="nx">content</span><span class="p">.</span><span class="nx">value</span>
+<span class="lineno">32 </span>                          <span class="p">}</span>
+<span class="lineno">33 </span>                        <span class="p">});</span>
+<span class="lineno">34 </span>                        <span class="nx">props</span><span class="p">.</span><span class="nx">history</span><span class="p">.</span><span class="nx">push</span><span class="p">(</span><span class="sb">`/articles/</span><span class="cp">${</span><span class="n">article</span><span class="o">.</span><span class="n">id</span><span class="cp">}</span><span class="sb">`</span><span class="p">);</span>
+<span class="lineno">35 </span>                      <span class="p">}}</span>
+<span class="lineno">36 </span>                    <span class="o">&gt;</span>
+<span class="lineno">37 </span>                      <span class="o">&lt;</span><span class="nx">div</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;form-group&quot;</span><span class="o">&gt;</span>
+<span class="lineno">38 </span>                        <span class="o">&lt;</span><span class="nx">label</span><span class="o">&gt;</span><span class="nx">Title</span><span class="o">&lt;</span><span class="err">/label&gt;</span>
+<span class="lineno">39 </span>                        <span class="o">&lt;</span><span class="nx">input</span> <span class="nx">type</span><span class="o">=</span><span class="s2">&quot;text&quot;</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;form-control&quot;</span>
+<span class="linenum">3. </span>                          <span class="nx">defaultValue</span><span class="o">=</span><span class="p">{</span><span class="nx">article</span><span class="p">.</span><span class="nx">title</span><span class="p">}</span> 
+<span class="lineno">41 </span>                          <span class="nx">ref</span><span class="o">=</span><span class="p">{</span><span class="kd">function</span><span class="p">(</span><span class="nx">node</span><span class="p">)</span> <span class="p">{</span> <span class="k">return</span> <span class="nx">title</span> <span class="o">=</span> <span class="nx">node</span><span class="p">;</span> <span class="p">}}</span> <span class="o">/&gt;</span>
+<span class="lineno">42 </span>                      <span class="o">&lt;</span><span class="err">/div&gt;</span>
+<span class="lineno">43 </span>                      <span class="o">&lt;</span><span class="nx">div</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;form-group&quot;</span><span class="o">&gt;</span>
+<span class="lineno">44 </span>                        <span class="o">&lt;</span><span class="nx">label</span><span class="o">&gt;</span><span class="nx">Content</span><span class="o">&lt;</span><span class="err">/label&gt;</span>
+<span class="lineno">45 </span>                        <span class="o">&lt;</span><span class="nx">textarea</span> <span class="nx">rows</span><span class="o">=</span><span class="s2">&quot;5&quot;</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;form-control&quot;</span>
+<span class="lineno">46 </span>                          <span class="nx">defaultValue</span><span class="o">=</span><span class="p">{</span><span class="nx">article</span><span class="p">.</span><span class="nx">content</span><span class="p">}</span> 
+<span class="lineno">47 </span>                          <span class="nx">ref</span><span class="o">=</span><span class="p">{</span><span class="kd">function</span><span class="p">(</span><span class="nx">node</span><span class="p">)</span> <span class="p">{</span> <span class="k">return</span> <span class="nx">content</span> <span class="o">=</span> <span class="nx">node</span><span class="p">;</span> <span class="p">}}</span> <span class="o">/&gt;</span>
+<span class="lineno">48 </span>                      <span class="o">&lt;</span><span class="err">/div&gt;</span>
+<span class="lineno">49 </span>                      <span class="o">&lt;</span><span class="nx">div</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;btn-group&quot;</span><span class="o">&gt;</span>
+<span class="lineno">50 </span>                        <span class="o">&lt;</span><span class="nx">button</span> <span class="nx">type</span><span class="o">=</span><span class="s2">&quot;submit&quot;</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;btn btn-primary&quot;</span><span class="o">&gt;</span><span class="nx">Update</span><span class="o">&lt;</span><span class="err">/button&gt;</span>
+<span class="lineno">51 </span>                        <span class="o">&lt;</span><span class="nx">button</span> <span class="nx">type</span><span class="o">=</span><span class="s2">&quot;button&quot;</span> <span class="nx">className</span><span class="o">=</span><span class="s2">&quot;btn btn-secondary&quot;</span> 
+<span class="lineno">52 </span>                          <span class="nx">onClick</span><span class="o">=</span><span class="p">{</span><span class="kd">function</span><span class="p">()</span> <span class="p">{</span> <span class="nx">handleCancel</span><span class="p">(</span><span class="nx">article</span><span class="p">.</span><span class="nx">id</span><span class="p">)</span> <span class="p">}}</span><span class="o">&gt;</span><span class="nx">Cancel</span><span class="o">&lt;</span><span class="err">/button&gt;</span>
+<span class="lineno">53 </span>                      <span class="o">&lt;</span><span class="err">/div&gt;</span>
+<span class="lineno">54 </span>                    <span class="o">&lt;</span><span class="err">/form&gt;</span>
+<span class="lineno">55 </span>                    <span class="p">{</span><span class="nx">loading</span> <span class="o">&amp;&amp;</span> <span class="o">&lt;</span><span class="nx">p</span><span class="o">&gt;</span><span class="nx">Loading</span><span class="p">...</span><span class="o">&lt;</span><span class="err">/p&gt;}</span>
+<span class="lineno">56 </span>                    <span class="p">{</span><span class="nx">error</span> <span class="o">&amp;&amp;</span> <span class="o">&lt;</span><span class="nx">p</span><span class="o">&gt;</span><span class="nb">Error</span> <span class="o">:</span> <span class="p">{</span><span class="nx">error</span><span class="p">.</span><span class="nx">message</span><span class="p">}</span><span class="o">&lt;</span><span class="err">/p&gt;}</span>
+<span class="lineno">57 </span>                  <span class="o">&lt;</span><span class="err">/div&gt;</span>
+<span class="lineno">58 </span>                <span class="p">)</span>
+<span class="lineno">59 </span>              <span class="p">}}</span>
+<span class="lineno">60 </span>            <span class="o">&lt;</span><span class="err">/Mutation&gt;</span>
+<span class="lineno">61 </span>          <span class="o">&lt;</span><span class="err">/div&gt;</span>
+<span class="lineno">62 </span>        <span class="p">);</span>
+<span class="lineno">63 </span>      <span class="p">}}</span>
+<span class="lineno">64 </span>    <span class="o">&lt;</span><span class="err">/Query&gt;      </span>
+<span class="lineno">65 </span>  <span class="p">)</span>
+<span class="lineno">66 </span><span class="p">}</span>
+<span class="lineno">67 </span>
+<span class="lineno">68 </span><span class="kr">export</span> <span class="k">default</span> <span class="nx">ArticleEdit</span><span class="p">;</span>
+</pre></div>
+
+We are using the same concepts used in ArticleInfo for the Query component and ArticleAdd for the Mutation component and form. So I will only point out what is new or different.
+<ol>
+<li>We have two potential loading or error responses. One on the initial GET_ARTICLE query, and one on the UPDATE_ARTICLE mutation.</li>
+<li>UpdateArticle() is a mutate function. It takes an options object as its argument. We are using the variables option to pass the form data for the update. What is different from the createArticle() mutate function in the ArticleAdd's Mutation component is we don't have to add any options (i.e., update or refreshQueries) to update our cache. Apollo will take the response from the API and update the cache for us behind the scenes.</li>
+<li>To populate the form fields with the existing values we are using React's defaultValue property.</li>
+</ol>
+
+<p class='mt-3'>Test it out by editing an article in the browser.</p>
+<p>This completes our last component. There are two more brief topics, both optional, then we are done.</p>
+
+<hr class="space">
+<h4>Apollo Client Developer Tool for Chrome Browsers</h4>
+<p>Apollo has created a plug-in for Chrome Developer Tools that is pretty useful. You can download it free at <a href="https://chrome.google.com/webstore/detail/apollo-client-developer-t/jdkknkkbebbapilgoeccciglkfbmbnfm">chrome.google.com/webstore/detail/apollo-client-developer-t/jdkknkkbebbapilgoeccciglkfbmbnfm</a></p>
+
+
+<hr class="space" id='npm-run-dev'>
+<h4>Run the API and React Client with one command</h4>
+<p class='mb-1'>Right now we need separate terminal windows open to run our back end API server (port 4000) and our front end React app (port 3000). Not to mention our MongoDB server. For convenience we can run our API and React apps with one command using the Concurrently package. Make sure you are in the project's root directory (not in the client folder). Using the --save-dev flag installs it as a development environment dependency.</p> 
+<li class="dlr"><code>npm install concurrently --save-dev</code></li>
+<p class='mt-3 mb-1'></p>
+Open the package.json file in the project's root directory (not the one in the client folder) and add the highlighted script below. Note that you need to add a comma after the start script.</p>
+<pre>
+<span>// package.json</span>
+  ...
+  "scripts": {
+    "start": "node server.js"<b>,
+    "dev": "concurrently \"nodemon server.js\" \"cd client && npm run start\""</b>
+  },
+  ...
+  "devDependencies": {
+    "concurrently": "^4.1.1"
+  },
+</pre>
+<p class='mb-1'>This will run the nodemon command on the API application starting the server on port 4000. Then it will cd to the client directory and run the start command which will run the React app on port 3000. To execute this script, make sure you stop both servers first, then from the project's root directory run:</p>
+<li class="dlr"><code>npm run dev</code></li>
+<p class='mt-3'>This should start both servers and open the React app in your browser.</p>
+
+<hr>
+<p>You now have a fully functioning GraphQL app using Node.js, MongoDB, and React with all four CRUD capabilities. That's a pretty advanced stack. Not bad.</p>
+
+</div>
+</body>
+</html>

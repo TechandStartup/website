@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Deploy MERN App to Heroku Tutorial</title>
+  <meta name="description" content="Tutorial on how to build a web app using the MERN stack."> 
+  <meta name="keywords" content="MERN App, Heroku, Node API, Node.js, Express, MongoDB, React">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Deploy MERN App to Heroku</h1>
+  <p>Deploy a web application using the Node.js, Express, MongoDB, React stack to Heroku.</p>
+  <p>By Steve Carey - 7/9/2019</p>
+  <p>Starting code: <a href="https://github.com/steve981cr/mern-app">Github</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<h2>Introduction</h2>
+<p>This tutorial assumes you have a MERN application built. If you don't, you can build one with my two part tutorial: <a href="express_mongo_api">Build an API with Node.js, Express and MongoDB</a> and <a href="mern_app">Integrate React into a Node application</a>.</p>
+
+<hr class="space">
+<h3 id='dotenv'>Dotenv Package and environmental variables</h3>
+<p class='mb-1'>Heroku requires you to use a cloud database platform for MongoDB. MongoDB's Atlas cloud service requires a user name and password as part of the URL. To keep these private you should use environmental variables so that they are not explicitly in your application's code. Assuming you are using Atlas for both development and production, you should add the dotenv package for your development environment if you expect to expose the file in a place like a public github repository. From the project's root directory:</p>
+<li class="dlr"><code>npm install dotenv</code></li>
+<p class='mt-3 mb-1'>In Node, environment variables can be accessed on the process.env object. The dotenv middleware looks for a file called .env and loads it's contents into the process.env variable for use in your code.</p>
+<p class='mb-1'>Create a .env file in the project's root directory:</p>
+<li class="dlr"><code>touch .env</code></li>
+<p class="mt-3 mb-1">Add environmental variables on new lines in the form of NAME=VALUE. By convention, use names in all upper case with words separated by underscores like MONGODB_URI. Add your MongoDB Atlas database link since it contains your user name and password. Something like this:</p>
+<pre>
+<span># .env</span>
+MONGODB_URI=mongodb+srv://<i>user</i>:<i>password</i>@<i>cluster-number</i>.mongodb.net/test?retryWrites=true&w=majority
+</pre>
+<p>We are only using the .env file in our development environment. When you deploy your app on Heroku you need to add this as an environmental variable on Heroku at that time.</p> 
+
+<hr>
+<h3>Server.js Update</h3>
+<p>Update the server.js file with changes related to Heroku highlighted and explained below.</p>
+<pre>
+<span>// server.js</span>
+
+const express = require('express');
+const mongoose = require('mongoose');
+const router = require('./routes/index');
+<b>const path = require('path');</b>           <span>#1</span>
+<b>const PORT = process.env.PORT || 3001;</b>  <span>#2</span>
+<b>require('dotenv').config();</b>             <span>#3</span>
+
+const app = express();
+
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use('/api', router);
+
+<b>mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true });</b> <span>#4</span>
+mongoose.connection.once('open', () => {
+  console.log('Connected to the Database.');
+});
+mongoose.connection.on('error', err => {
+  console.log('Mongoose Connection Error : ' + err);
+});
+
+<b>if (process.env.NODE_ENV === 'production') {           <span>#5</span>
+  app.use(express.static('client/build'));
+
+  app.get('*', (req, res) => {
+    res.sendFile(path.resolve(__dirname, 'client', 'build', 'index.html'));
+  });
+}</b>
+
+app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}.`);
+});
+</pre>
+
+<ol>
+  <li>Path is a module within Node so we don't install it with npm. The path module provides utilities for working with file and directory paths and is needed to work on Heroku.</li>
+  <li>Heroku will assign a port via the PORT environmental variable. We'll use the or operator || to assign that as the port or 3001 if it is null (i.e., if we are in the dev environment).</li>
+  <li>Require and configure dotenv middleware.</li>
+  <li>Connect to the database URI taken from the environmental variable.<br>
+    You could use a local MongoDB instance for your development environment and use the cloud for production. If you take that route then you would would set it up like this: <br>
+    <code>const LOCAL_DB = "mongodb://127.0.0.1:27017/my_local_db";</code> <br>
+    <code>mongoose.connect(process.env.MONGODB_URI || LOCAL_DB, { useNewUrlParser: true });</code>
+  </li>
+  <li>When you deploy your app to Heroku, Heroku will run the build command on the React app and move the finished version to the build folder. This conditional statement tells Heroku that your React files will be in the client/build folder and URL requests will go to the client/build/index.html file where your SPA React app is served from.</li>
+</ol>
+</div>
+
+<hr>
+<h3>Package.json</h3>
+<p>The React app in development is not optimized. We need to run the npm build (or yarn build) command for React to minify all your React code and put it into a folder called build. But actually we'll instruct Heroku to do that for you when you deploy. Add a script to the package.json file in the project root directory with property heroku-postbuild (bolded below). Heroku will run that script after it builds your app. The script cds into the client directory, runs npm install to install the React packages, and npm run build to build the optimized version in the build folder. Your finished package.json file should look something like the below.</p>
+<pre>
+<span>// package.json</span>
+{
+  "name": "mern-app-tutorial",
+  "version": "1.0.0",
+  "description": "Web app built with Node.js, Express, MongoDB, and React",
+  "main": "server.js",
+  "dependencies": {
+    "dotenv": "^8.0.0",
+    "express": "^4.17.1",
+    "mongoose": "^5.6.3"
+  },
+  "devDependencies": {
+    "concurrently": "^4.1.1"
+  },
+  "scripts": {
+    <b>"start": "node server.js",</b>
+    "dev": "concurrently \"nodemon server.js\" \"cd client && npm run start\"",
+    <b>"heroku-postbuild": "cd client && npm install && npm run build"</b>
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT"
+}
+</pre>
+<p class='mt-1'>Also note the "start" script. We used that in development to start the Express server with npm start. But we ignored it with our npm run dev script, using nodemon instead. But for production this script will come in handy since we want Heroku to run our server file with node once it's built.</p>
+<p>Once Heroku is done building the app it will look for a file called Procfile for instructions on how to start the app. So we could create a Procfile and add one line <code>web: npm run start</code>. If Heroku doesn't find a Procfile it will run the command <code>npm start</code>. So that's why we need the start script to run <code>node server.js</code>.</p>
+
+<hr>
+<h3>Git repository</h3>
+<p>We will use git to push our app to Heroku.</p>
+<p>When we generated our React app with create-react-app, it generated a git repository and created a gitignore file in the client folder. We want one git repository in our root directory for both our API and our React client. So if you haven't already, delete the .git repository in the client folder. The gitignore file is fine where it is. Git will honor multiple gitignore files so we'll just add another one at the root directory.</p>
+<p class='mb-1'>Now in our project's root directory initate a new git repository and create a .gitignore file.</p>
+<li class="dlr"><code>git init</code></li>
+<li class="dlr"><code>touch .gitignore</code></li>
+<p>Add the .env file and the node_modules folders to our new gitignore file.</p>
+<pre>
+<span>// .gitignore</span>
+
+node_modules
+.env
+</pre>
+
+<hr>
+<h4>Set up Heroku</h4>
+<p>This tutorial assumes you are already familiar with Heroku. If not, you need to first create an account on their website: <a href="https://www.heroku.com">heroku.com</a><br>
+Then download and install the Heroku Command Line Interface on your computer <a href="https://devcenter.heroku.com/articles/heroku-cli">devcenter.heroku.com/articles/heroku-cli</a>.</p>
+<p class='mb-0'>From the CLI, create a new Heroku App:</p>
+<li class="dlr"><code>heroku create <i>appname</i></code></li>
+<p>If your appname is already taken you'll have to pick another one. Or leave off the appname and let Heroku generate a super awesome one for you. If you have a real domain name you can configure Heroku to use that <a href="https://devcenter.heroku.com/articles/custom-domains">devcenter.heroku.com/articles/custom-domains</a></p>
+<p class='mb-1'>This will automatically set heroku as your git remote repository. Run the below command to confirm. It will list the project's remote git repositories (if any) and their urls.</p>
+<li class="dlr"><code>git remote -v</code></li>
+<p>Set the MongoDB uri as an environmental variable (no quotes):</p>
+<li class="dlr"><code>heroku config:set MONGODB_URI=<i>Your db cloud link goes here</i></code></li>
+<p>As of this writing there is no Heroku Add-On for the the MongoDB Atlas cloud service.</p>
+<hr>
+<h4>Deploy your app</h4>
+<p class='mt-3 mb-1'>Create your initial git commit:</p>
+<li class="dlr"><code>git add -A</code></li>
+<li class="dlr"><code>git commit -m "Initial commit"</code></li>
+<p class='my-1'>Then push the code out to heroku:</p>
+<li class="dlr"><code>git push heroku master</code></li>
+<p>It will take a few minutes to load up. When it's finished launch the app. The below command will open the app in your browser:</p>
+<li class="dlr"><code>heroku open</code></li>
+
+<p>If everything went well you have a working MERN application up and running on Heroku!</p>
+
+</div>
+</body>
+</html>

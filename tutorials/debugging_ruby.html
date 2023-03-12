@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Ruby Error Handling Tutorial</title>
+  <meta name="description" content="Tutorial on Error Handling and Debugging Ruby and Rails code."> 
+  <meta name="keywords" content="Ruby Error Handling, Rails Error Handling, Debugging Ruby, Debugging Rails">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Error Handling and Debugging Ruby Code</h1>
+  <p>By Steve Carey - 3/3/2018</p>
+</div>
+
+<div class="slightly-shrink-font">
+<p>Below are Ruby debugging techniques that have worked best for me. Rails has built techniques like logs and exceptions into it's code base so knowing how to leverage them will be useful when building a plain Ruby or a Ruby on Rails application.</p>
+
+<hr class="space">
+<h3>Logging</h3>
+<p>Create logs at different points in your code that print status and useful information to the terminal window that your server is running on. Do that with the <i>puts</i> method. If you have an error you can look at the logs to see what the last successful log message was. That way you know your code worked up to that point. The below example prints some environmental variables when a client sends a request to view a web page. This logs the request method, request path, and the current date and time:
+</p>
+<pre>
+class Application
+  def call(env)
+    ...
+    <b>puts("Started #{request.request_method} \"#{request.path}\" #{Time.now}")</b>
+    ... 
+  end
+end
+</pre>
+<p>And this log prints the parameters of a request when a controller object is created. The \s space character and the space after it will indent the log two spaces.</p>
+<pre>
+class Controller
+  def initialize(request)
+    @request = request
+    <b>puts("\s Parameters #{@request.params}")</b>
+  end
+</pre>
+
+<hr class="space">
+<h3>Use Conditionals for User Errors</h3>
+<p>If we get invalid input from the user, we want to provide them feedback so they can correct it. So from our code's perspective this is not an error. We handle it with conditional statements. For instance if we have a Routing class that checks the URL path a user entered and it doesn't match any valid route, we can use an if/else statement to return a 404 Not Found Response:</p>
+<pre>
+def dispatch
+  if <i>URL path is valid</i>
+    <i>code for handling a valid URL path</i>
+  else
+    Rack::Response.new(["Nothing found"], 404, {"Content-Type" => "text/html"})
+  end
+end
+</pre>
+
+<hr class="space">
+<h3>Use Exceptions to Handle Unexpected Results</h3>
+<p>The above example will handle the user error of entering an invalid URL. But what if there is a programming or other unexpected result that prevents the page they requested from being displayed? Well, we still want to send them a message saying that something went wrong. And we want to log the error so we can trace its source.</p>
+<pre>
+def dispatch
+  if <i>URL path is valid</i>
+    <i>code for handling a valid URL path</i>
+  else
+    Rack::Response.new(["Nothing found"], 404, {"Content-Type" => "text/html"})
+  end
+<b>rescue StandardError => error</b>
+  puts("#{error.class.name}: #{error.message}")
+  puts("Exception source stack displays filename, line number, and method the exception is in:")
+  puts(error.backtrace)
+  Rack::Response.new(["Internal error"], 500, {"Content-Type" => "text/html"})
+end
+</pre>
+<p>The keyword rescue will start a block where you can handle an exception. In this case we are sending a response to the client that just says "Internal Error" with status code 500. But we are also using puts statements to print the error information to our terminal for debugging.</p>
+<p>Ruby's overall exception class is Exception. But within that there are multiple subclasses and subclasses within those. The full list is at <a href="http://ruby-doc.org/core-2.5.0/Exception.html">ruby-doc.org - Exception</a></p>
+<p>An exception means anything unexpected, generally some kind of error. Rescue applies to the StandardError class (and it's subclasses) by default, but you can specify a different exception class to apply it to.</p>
+<p>Like everything in Ruby, the exception is an object. The keyword <i>rescue</i> gives us access to that object and <code>=> <i>variable name</i></code> assigns that exception object to the variable name we give it, such as "error." Then we can access the error object properties like class.name, message, and backtrace, and log them to our terminal using puts statements. Class.name let's us know what error class it is. Message will give us a (hopefully) helpful message to pinpoint the source of the error. And backtrace will return the filename, line number, and method that was the source of the exception. There will be a whole stack of these, with the top one being the direct source of the error, and below that are the methods affected by the error, in order.</p>
+<p>It is good practice to try to pinpoint the type of errors you might get and create different rescue blocks if you want to handle them differently. And you can even create your own exception class and inherit from StandardError or RuntimeError.</p>
+<p>If you want to limit the section of code to apply your rescue to, then use a begin block before the rescue block:</p>
+<pre>
+def dispatch
+  <i>some code you don't want rescued</i>
+  <b>begin</b>
+    <i>code that may need rescuing</i>
+  <b>rescue</b>
+    <i>code to execute if there is a StandardError exception.</i>
+  <b>end</b>
+end
+</pre>
+<p>
+<b>More info:</b><br>
+Ruby Docs: <a href="https://docs.ruby-lang.org/en/2.5.0/syntax/exceptions_rdoc.html">docs.ruby-lang.org - exceptions</a><br>
+Informative Blog post: <a href="http://blog.honeybadger.io/a-beginner-s-guide-to-exceptions-in-ruby/">blog.honeybadger.io - Beginner's Guide to Exceptions in Ruby</a></p>
+
+<hr class="space">
+<h3>Debugging</h3>
+<p>Okay, you have an error and you need to trace it. Follow these steps:<br>
+<h4>Exception Logs</h4>
+Go through your logs to see if there is an Exception message. If so, look at the error class and message first. Then look at the backtrace, which will give you the filename, line number and method that is the source of the problem. There will be a whole stack of these. The top one is the source of the error, and each one below it are a cascade of methods that rely on that result, all the way up the stack.</p>
+<h4>Trace the Error On Your Own</h4>
+<p>If the Exception logs didn't help you then look at your regular logs to see how far your code progressed before the error. So you will know it was working up to the last expected log message. Then you can use temporary puts statements or even better, the Byebug gem.</p>
+<h5>Temporary Puts</h5>
+<p>You can insert temporary puts statements in your code to print out variables or just to confirm that your code makes it to a certain point. <br>
+<pre>
+class Controller
+  ...
+  def dispatch
+    ...
+    <b>puts "At Controller#Dispatch"</b>
+  end
+end
+</pre>
+</p>
+<p>Then once you've fixed your bug, delete the puts statement.</p>
+
+<h5>Byebug Gem</h5>
+<p><b>Homepage:</b> <a href="https://github.com/deivid-rodriguez/byebug">github.com/deivid-rodriguez/byebug</a></p>
+<p>Byebug is a very useful gem for debugging. Rails automatically adds it to the Gemfile of a new Rails project. You only want this gem in your Development and Testing Environment though. Not in Production.</p>
+<pre>
+<b># Gemfile</b>
+group :development, :test do
+  gem 'byebug'
+end
+</pre>
+<code>bundle install</code>
+
+<p>To use it you simply add <code>byebug</code> as a statement line in your code. Put it just above the statement you think may be causing the error.<br>
+You may also need to require it in the file you are debugging. <br>
+<pre>
+<b>require 'byebug'</b>
+class <i>ClassName</i>
+  ...
+  def <i>method_name</i>
+    ...
+    <b>byebug</b>
+    ...
+  end
+end
+</pre>
+<p>Then when you run your program it will stop when it hits <code>byebug</code>. Go to the terminal window that is running your server and you will see a &lt;byebug> shell where you can run Ruby code from the point you are in. And you can step through the code line by line by typing in <code>n</code> for next. Below are a few handy commands and methods you can use:</p>
+<b>n</b> - Executes the current line of code and takes you to the next line. <br>
+<b>irb</b> - Opens an IRB shell.<br>
+<b>Control+D</b> - Exit Byebug.<br>
+<b>self.class</b> - Return name of the class you are in.<br>
+<b>self.class.ancestors</b> - Return array of the class you are in, and it's chain of parent classes and modules it inherits from, in order from left to right. <br>
+<b><i>variable_name</i></b> - You can enter variable names to see if they return what you expected.<br>
+<b><i>ClassName.method_name</i></b> - You can experiment with any code. Run a method on a class.<br>
+<b><i>object.method_name</i></b> - Run a method on an object.
+</p>
+
+<h5>Web-console gem for Rails</h5>
+<p>As mentioned above, Rails automatically adds the byebug gem to your Gemfile when you start a new Rails project. But Rails also adds another gem called web-console to your development environment:</p>
+<pre>
+<b># Gemfile</b>
+group :development do
+  gem 'web-console'
+  ...
+end
+</pre>
+<p>This is a debugging tool like Byebug except it puts an IRB shell at the bottom of the web page. It does that on exception pages, and, similar to Byebug, wherever you insert <code>console</code> in your code. You can also put it in a view file using erb: <code>&lt;%= console %></code></p>
+</div>
+</div>
+</body>
+</html>

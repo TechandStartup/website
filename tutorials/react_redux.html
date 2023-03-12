@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title></title>
+  <meta name="description" content=""> 
+  <meta name="keywords" content="">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Learn Redux with React - UNPUBLISHED WIP</h1>
+  <p>Beginner React with Redux Tutorial</p>
+  <p>By Steve Carey - 8/15/2018</p>
+  <!-- <p><b>Part 1: Beginning Redux</b></p> -->
+</div>
+
+<div class="slightly-shrink-font">
+<h2>Introduction</h2>
+<p>Redux is a light weight Node package that helps you manage state. It is not part of React but it works well with React. It is useful when React apps get large and start to become unweildy. Adding Redux to a React app let's you manage state in one place. The approach I've seen for teaching beginning Redux is to teach it in isolation, then at the end splice it into a React application. In this tutorial we teach Redux in the context of React applications, as that approach worked better for me and maybe I'm not alone. We will be taking very simple React applications and converting them to use Redux, and explain Redux along the way.</p>
+<p>This tutorial assumes you are reasonably comfortable with React and its main concepts such as JSX, render, components, props, state, lifecycle, events, lists/keys, and forms. 
+It assumes you are familiar with ES6 syntax.
+It does not assume any prior knowledge of Redux.</p>
+
+<hr class="space">
+<h2>Build the App</h2>
+<p>Let's jump right in. Use Create React App to set up a React app.</p>
+<li class="dlr"><code>create-react-app react-redux-tutorial</code></li>
+<p class="dlr"><code>cd react-redux-tutorial</code></p>
+<p>Install the redux and react-redux packages:</p>
+<p class="dlr"><code>npm install --save redux react-redux</code></p>
+<p>Start React to make sure it's working:</p>
+<p class="dlr"><code>npm start</code></p>
+<p>You should see the default Welcome to React app in your browser.</p>
+
+<h4>Hello State</h4>
+<p>Now replace the contents of App.js to a Hello app from the official React tutorials and test it in the browser. This simply demonstrates how to change state in React.</p>
+<pre>
+// src/App.js 
+import React, { Component } from 'react';
+
+class App extends Component {
+  constructor(){ 
+    super(); 
+    this.state = { message: "from state!" };
+    this.handleClick = this.handleClick.bind(this);
+  }
+  handleClick() {
+    this.setState({
+      message: "from changed state!"
+    });
+  }    
+  render() {
+    return( 
+      &lt;div>
+        &lt;h3>Hello {this.state.message}!&lt;/h3>
+        &lt;button onClick={this.handleClick}>Click me!&lt;/button>
+      &lt;/div>
+    )
+  }
+}
+
+export default App;
+</pre>
+<p>Now recreate the same React app using Redux.</p>
+<pre>
+// src/App.js
+import React, { Component } from 'react';
+import { createStore } from 'redux';
+
+const initialState =  { message: "from state!" }              //2a
+const reducer = (state = initialState, action) => {           //2b
+  switch (action.type) {                                      //2c
+    case 'CHANGE_STATE':                                      //2d
+      return { message: action.payload.message };
+    default:                                                  //2e
+      return state;
+  }
+};
+
+const store = createStore(reducer);                            //1
+
+class App extends Component {
+  constructor() {                                              //3
+    super();
+    this.handleClick = this.handleClick.bind(this);
+  }
+  componentDidMount() {                                        //6a
+    store.subscribe(() => this.setState(store.getState()));    //6b
+  }
+  handleClick() {                                              //5
+    store.dispatch({                                           //5a
+      type: 'CHANGE_STATE',                                    //5b
+      payload: {message: "from changed state!"}                //5c
+    });
+  }  
+  render() {                                                   //4
+    return (
+      &lt;div className="container">
+        &lt;h3>Hello {store.getState().message}!&lt;/h3>             //4a
+        &lt;button onClick={this.handleClick}>Click me!&lt;/button>  //4b
+      &lt;/div>
+    );
+  }
+}
+
+export default App;
+</pre>
+<p>Let's go through the code: <br>
+1) <b>Store:</b> Use the Redux createStore method to create the store. <br>
+2) <b>Reducer function:</b> <br> 
+2a) Define a variable with the initial state for a property we will use for our initial state. <br>
+2b) Define a reducer function expression (could also use a function declaration). Here we are naming it "reducer" but it can be any name. Reducers take two arguments, state and action. For state you need to set the initial state. We are using an ES6 default parameter. <br>
+2c) We'll use a switch statement to return different results based on the action type. <br>
+2e) We set the default value to state, so before any action is called on it, state will be the initial state.
+Action: Send an action to the reducer. <br>
+3) App Component Constructor function: In a React app you can create a component with a function or a class. When you use a class you set the initial state in the constructor function. Only now that state is managed by the Redux store, the intial state is set in the reducer. So we remove <code>this.state = { message: "from state!" };</code> from the constructor, and leaving just the this.handleClick method to bind. <br>
+4) The render method of a component holds the JSX that will eventually be displayed as HTML in the browser. <br>
+4a) Within the render's JSX, the Hello message includes an expression that uses data from the current state. In the React-only version we called state directly with <code>{this.state.message}</code>. Now we get the current state by calling getState() on the store.<br>
+4b) There is also a button with an onClick attribute that calls the handleClick hander function on the click event. <br>
+5) <b>Action:</b> When the handleClick handler function is called it invokes a Redux action of type 'CHANGE_STATE.' <br>
+5a) Redux uses the dispatch(<i>action</i>) method on the store to update the current state. <br>
+5b) The argument to the dispatch method is the action object. The Type property is required, and "CHANGE_STATE" can be any name you want like "NEW_MESSAGE." <br> 
+5c) The action object can have any other properties you deem necessary. An common property is a payload. Here we are sending a new message value. <br>
+2c) When a dispatch method calls the reducer to pass in an action, it goes through the switch statement. <br>
+2d) In this case the action type is 'CHANGE_STATE'. This simply returns the action payload message. <br>
+6a) ComponentDidMount is a built-in React life-cycle method that is invoked when a component is mounted. This is where you make API calls, or in this case place our subscription. It returns a result when it is received. <br>
+6b) The Redux subscribe method is a change listener that is called any time an action is dispatched. 
+</p>
+
+<h4>Toggle State - Checkbox</h4>
+<p>Let's try another one. This one is similar to the first except this time you can toggle back and forth. It will be a checkbox that lets you publish an article. When checked, the checkbox shows a check and the article appears. When unchecked, the checkbox clears and the article no longer displays.</p>
+<b>React only version:</b>
+<pre>
+// src/App.js 
+import React, { Component } from 'react';
+
+class App extends Component {
+  constructor(){ 
+    super(); 
+    this.state = {published: false};
+    this.handleInputChange = this.handleInputChange.bind(this);
+  }
+  handleInputChange() {
+    this.setState(prevState => ({
+      published: !prevState.published
+    }));
+  }    
+  render() {
+    return( 
+      &lt;div>
+        &lt;h1>Article&lt;/h1>
+        &lt;label>Publish&lt;/label>
+        &lt;input type="checkbox" checked={this.state.published} onChange={this.handleInputChange} />
+        {
+          this.state.published ? 
+          (&lt;div>
+            &lt;h2>Learn Redux&lt;/h2>
+            &lt;p>Lorem Ipsum&lt;/p>
+          &lt;/div>)
+          : null
+        }
+      &lt;/div>
+    )
+  }
+}
+
+export default App;
+</pre>
+
+<b>React with Redux:</b>
+<pre>
+import React, { Component } from 'react';
+import { createStore } from 'redux';
+
+const initialState = {published: false};                                           //2a
+const publishedCheckbox = function(state = initialState, action) {                 //2b
+  switch (action.type) {                                                           //2c
+    case 'TOGGLE':                                                                 //2d
+      return { published: !state.published };
+    default:                                                                       //2e
+      return state;
+  }
+};
+
+const store = createStore(publishedCheckbox);                                       //1
+
+class App extends Component {                                                       //3
+  componentDidMount() {                                                             //6a
+    store.subscribe(() => this.setState(store.getState()));                         //6b
+  }
+  render() {                                                                        //4
+    const handleInputChange = () => store.dispatch({ type: 'TOGGLE' });             //5
+    const published = store.getState().published;                                   //4a
+    return (
+      &lt;div>
+        &lt;h1>Article&lt;/h1>
+        &lt;label>Publish&lt;/label>
+        &lt;input type="checkbox" checked={published} onChange={handleInputChange} />  //4b
+        {
+          published ?                                                               //4c
+          (&lt;div>
+            &lt;h2>Learn Redux&lt;/h2>
+            &lt;p>Lorem Ipsum&lt;/p>
+          &lt;/div>)
+          : null
+        }
+      &lt;/div>
+    );
+  }
+}
+
+export default App;
+</pre>
+<p>The breakdown of the code will be similar. This time the handler function (handleInputChange) is within the render function. That means there is no need to bind it to "this" in the constructor function. <br>
+1) <b>Store:</b> create the store with the Redux createStore method. <br>
+2) <b>Reducer function:</b> <br> 
+2a) Instead of defining the initial state in a constructor function like you do with React, in Redux you define it in the reducer. We'll declare a variable with the initial state of the "published" property to false.<br>
+2b) Define a reducer function. You could also use a function expression: <code>const reducer = function(state = initialState, action) {</code>. In the first example we named the reducer function "reducer", which is fine if your app only has one reducer. If not you need to use descriptive names such as publishedCheckbox. Reducers take two arguments, state and action. For state you need to set the initial state. We are setting an ES6 default parameter to the variable set above it. <br>
+2c) The switch statement to returns different results based on the action type passed in as the reducer argument. <br>
+2e) You need to include a default return value set to the current state in case the switch statement does not produce a match. Since we set <code>published: false</code> as the initial state, that will be the default value. <br>
+3) Define a class component called "App" (or wantever name you want to give it). Components can be defined as either a class or a function. Since we will be using a lifecycle method, "componentDidMount", and a render method, we'll put them both inside a component class. Notice we no longer have a a constructor function. That's because this time we both calling and defining the handler function, "handleInputChange" within the render. As such, there is no need to bind "this" to "this.handleInputChange" and therefore no reason to have a constructor function at all. <br>
+4) The render method of a component returns JSX which is then converted to HTML by the ReactDOM.render method in the src/index.js file.<br>
+4a) We will be using the current state of "published" in the JSX we return. Declare a variable to retrieve it from the store using the <code>getState</code> Redux method.<br>
+4b) Create an input element of type checkbox. Set the "checked" attribute to the "published" variable defined above. Set an onChange event attribute that calls the handler function named handleInputChange (or whatever name you prefer to use). Because the function is defined in the same render method, you don't need to use "this."<br>
+4c) Add a ternary statement that will insert some JSX with the article title and content if the published property is true.<br>
+5) <b>Action:</b> Here we define the handleInputChange handler function expression inside the render method. It is called by the onChange event in the input checkbox element. The handler calls Redux's "dispatch" method on the store. This is the only way to trigger a state change. The dispatch method takes a Redux "action" as its argument. An action is an object that must pass the "type" property, and may pass other properties such as a payload. Here we are only passing the type property, defined as the string literal 'TOGGLE'.<br>
+2c) The dispatch method is called on the store variable defined in step 1. That in turn calls the "publishedCheckbox" reducer function. The reducer function puts the action type through a switch statement.<br>
+2d) The action type we pass in the argument is 'TOGGLE'. This returns an object with a "published" property that is set to the opposite of the published current state: <code>return { published: !state.published };</code>. This works since the value is a boolean thus only has two possible values. <br>
+
+6a) ComponentDidMount is a built-in React life-cycle method that is invoked when a component is mounted. This is where you make API calls, or in this case place our subscription. It returns a result when it is received. <br>
+6b) The Redux subscribe method is a change listener that is called any time an action is dispatched. 
+</p>
+</div>
+</div>
+</body>
+</html>

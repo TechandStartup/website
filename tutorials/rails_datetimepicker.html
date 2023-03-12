@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Rails Datetimepicker Tutorial</title>
+  <meta name="description" content="Rails tutorial on how to use Datetimepicker with Bootstrap 4. Uses the bootstrap4-datetime-picker-rails gem."> 
+  <meta name="keywords" content="Rails datetime picker, bootstrap4-datetime-picker-rails gem">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Ruby on Rails - Datetimepicker with Bootstrap 4 Tutorial</h1>
+  <p>By Steve Carey - 5/18/2018</p>
+</div>
+
+<div class="slightly-shrink-font">
+<p>Creating a good user experience when selecting a date and time in a form is much more complicated than it should be. I will show how to add a date picker, time picker and datetime picker to a Rails application using the Tempus Dominus JavaScript and CSS library for Bootstrap 4. This library is the successor to the popular bootstrap-datetimepicker library for Bootstrap 3.</p>
+
+<p>The finished version of the code is available at <a href="https://github.com/steve981cr/rails-datetimepicker-tutorial">github.com/steve981cr/rails-datetimepicker-tutorial</a>.</p>
+
+<hr class="space">
+<h3>Setup a new Rails app with Bootstrap</h3>
+<li><b>Generate an app:</b> <code>rails new datetimepicker-app</code></li>
+<li>Add the bootstrap gem which loads the latest version of Bootstrap 4. The instructions for installing the Bootstrap gem are at <a href="https://github.com/twbs/bootstrap-rubygem">github.com/twbs/bootstrap-rubygem</a>. </li>
+<li>Bootstrap requires jQuery so add the jquery-rails gem as well.</li>
+<li>Disable the coffee-rails and jbuilder gems unless you plan on using those.</li>
+<pre>
+# Gemfile
+
+# gem 'coffee-rails'
+# gem 'jbuilder'
+gem 'jquery-rails'
+gem 'bootstrap'
+</pre>
+<code>bundle install</code></p>
+<p>Require the jquery, popper and bootstrap-sprockets.</p>
+<pre>
+# app/assets/javascripts/application.js
+//= require jquery3
+//= require popper
+//= require bootstrap-sprockets
+...
+</pre>
+<p>Change the extension of the application.css file to scss. Then import the css file.</p>
+<pre>
+# app/assets/javascripts/application.scss
+@import "bootstrap";
+</pre>
+
+<h3>Font Awesome</h3>
+<p>Bootstrap 4 no longer uses glyphicons but instead leverages Font Awesome. At the time of this writing Font Awesome has just released version 5.0. It's not available as a gem yet so for now we can add a link to the CDN, found at <a href="https://fontawesome.com/get-started">fontawesome.com/get-started</a>, at the bottom of the application.html.erb head element. Version 5 has breaking changes from version 4 so many of the icons that the Tempus Dominus Bootstrap 4 library uses won't work without changing some options.</p> 
+<p>Now we have a working Rails app with Bootstrap, albeit with no content.</p>
+
+<hr class="space">
+<h3>Tempus Dominus Datepicker Dependencies</h3>
+<p><b>jQuery:</b> Like Bootstrap, Tempus Dominus uses jQuery.</p>
+<p><b>Font Awesome:</b> TempusDominus Bootstrap 4 uses Font Awesome icons.</p>
+<p><b>Bootstrap 4:</b> This is not actually a dependency and it does work without Bootstrap. But it uses Bootstrap CSS classes so unless you write your own CSS for the relevant class names, it works best with Bootstrap 4.</p>
+<p><b>Moment.js:</b> Moment.js is a lightweight javascript date library for parsing, manipulating, and formatting dates. It's docs are at <a href="https://momentjs.com/">momentjs.com</a>. You can access the library via a gem called momentjs-rails or though it's CDN.</p>
+
+<h3>Tempus Dominus Installation Options</h3>
+<p>There are three ways you can install Tempus Dominus:</p>
+<p>1) Add links to their content delivery network (CDN) in the head element of your application.html.erb page. Find the links at <a href="https://tempusdominus.github.io/bootstrap-4/">tempusdominus.github.io/bootstrap-4</a> which includes cdn links to their jQuery and Moment.js dependency libraries. The Font Awesome CDN link can be found at <a href="https://fontawesome.com/get-started">fontawesome.com/get-started</a>. The advantages and disadvantages of using CDNs vs. installing them locally are out of scope for this tutorial. Just be aware there are valid reasons to use either method.</p>
+<p>2) Place the libraries directly into your app. The main reason to do this is if you want to modify them in some way. 
+<li>Create assets directories in your vendor folder: 
+<code>mkdir vendor/assets; mkdir vendor/assets/javascripts; mkdir vendor/assets/stylesheets</code> </li>
+<li>Download the library from <a href="https://tempusdominus.github.io/bootstrap-4/">tempusdominus.github.io/bootstrap-4</a> and unzip it.</li>
+<li>Put the build/css/tempusdominus-bootstrap-4.css file into your vendor/assets/stylesheets folder.</li>
+<li>Put build/js/tempusdominus-bootstrap-4.js into your vendor/assets/javascripts folder.</li>
+<li>We are using the full versions instead of the minified ones since the files will be minified by the Asset Pipeline when put into production. This allows us to read and modify the code if needed.</li>
+<li>You still need to add the other dependencies through gems, CDNs, or directly.</li>
+</p>
+<p>3) Install the bootstrap4-datetime-picker-rails gem. We'll use this method.</p>
+
+<h3>Install and set up Tempus Dominus</h3>
+<p>Tempus Dominus Bootstrap 4 is wrapped in a Rails-ready gem called <a href="https://github.com/Bialogs/bootstrap4-datetime-picker-rails">bootstrap4-datetime-picker-rails</a>. Start by installing the required gems. This gem has momentjs-rails as a dependency so it will automatically be installed, but we'll add it explicitly.</p>
+<pre>
+# <b>Gemfile</b>
+gem 'jquery-rails'
+gem 'bootstrap'
+gem 'momentjs-rails'
+gem 'bootstrap4-datetime-picker-rails'
+</pre>
+<code>bundle install</code>
+<p>Require the jquery, moment, and tempus-bootstrap-4.js files.</p>
+<pre>
+# app/assets/javascripts/application.js
+//= require jquery3
+//= require popper
+//= require bootstrap-sprockets
+//= require moment
+//= require tempusdominus-bootstrap-4.js
+...
+</pre>
+<p>Then import the css file.</p>
+<pre>
+# app/assets/javascripts/application.scss
+@import "bootstrap";
+@import "tempusdominus-bootstrap-4.css"
+</pre>
+
+<hr class="space">
+<h3>Generate and setup an Events Resource</h3>
+<p>We'll use a scaffold generator. Many Rails developers never use the scaffold generator but I usually do. You can get rid of the unnecessary stuff by disabling the jbuilder gem and adding --no-helper and --no-assets flags. We'll create one date field, one time field, and two datetime fields, as well as a title field. There is not a Rails convention for date/time column names pre se, but ThoughtBot has a Rails styleguide that recommends using _on suffixes on date columns, _time suffixes on time colums, and _at suffixes on datetime columns, which Rails also uses for it's timestamp columns. That seems reasonable so we'll follow suit.<br>
+<code>rails generate scaffold Event title:string held_on:date start_time:time starts_at:datetime ends_at:datetime --no-helper --no-stylesheets</code> <br>
+<code>rails db:migrate</code></p>
+
+<p>Make the Events index page your root directory.
+<pre>
+# config/routes.rb
+root 'events#index'
+resources :events
+</pre>
+</p>
+
+<p>Open another Terminal window and from the project root directory start/restart the server <code>rails server</code>. Open up the browser to localhost:3000 and boom, we're in business. Gotta love Rails for that.</p>
+
+<h3>Rails default _select fields</h3>
+<p>If you click the New Event button in your browser it will take you to the event form. Notice there are select boxes for day, month, year, hour, and minute in the relevant form fields. This is a Rails trick when you use the date_select, time_select, and datetime_select form helpers which you can read about and view the options at <a href="http://api.rubyonrails.org/classes/ActionView/Helpers/DateHelper.html#method-i-date_select">api.rubyonrails.org - DateHelper - date_select</a>. Here are the default scaffold fields: </p>
+<pre>
+# app/views/events/_form.html.erb
+&lt;div class="field">
+  &lt;%= form.label :held_on %>
+  &lt;%= form.date_select :held_on %>
+&lt;/div>
+&lt;div class="field">
+  &lt;%= form.label :start_time %>
+  &lt;%= form.time_select :start_time %>
+&lt;/div>
+&lt;div class="field">
+  &lt;%= form.label :starts_at %>
+  &lt;%= form.datetime_select :starts_at %>
+&lt;/div>
+</pre>
+<p>This is not a terrible solution but the UI is not very nice even when you add CSS. But at least it's consistent in all browsers.</p>
+
+<h3>Active Record and Datetime.</h3>
+<p>Go ahead and create and submit an event in the new events form so we can see what it looks like in the database. Then open the rails console and run: <br>
+<code>Event.first</code><br>
+You'll see that the date field has the format of YYYY-MM-DD. The Datetime field is in the format of YYYY-MM-DD HH:MM:SS. These are the ISO 8601 international standard date and time formats which SQL and SQL databases like SQlite, Postgres and MySQL adhere to. Notice that the time field has a full date and time 2000-01-01 10:00:00 using 10am as an example. The date part is set to Jan 1, 2000 and is ignored by Rails. It looks odd but it's apparently the most efficient way to do it. If we were using a Postgresql database the values would be the same.</p>
+
+<p>We are using a SQlite database which actually doesn't have column types for date, time, or datetime. Rather it uses the string data type but saves the data in the appropriate SQL format. Postgres does have date, time and datetime column types. Remember, we assigned those data types when we created the database table, and you can see them in the db/schema.rb file.</p>
+<p>When a user submits a form, Rails recognizes commonly used date formats such as June 28, 2018, Thurs Jun 28, 2018, 2018-06-28, 28/6/2018 (but not 6/28/2018), etc. Rails is expecting a date, time or datetime format based on the data type of the field and converts the submitted data into a Ruby date, time, or datetime object. Then when it saves the object to the database it converts it to the standard SQL date, time, or datetime format. It does the opposite when retrieving data from the database.</p>
+</p>
+
+<h3>HTML5 input types</h3>
+<p>HTML5 introduced form input types for date, time and datetime among others. Rails has corresponding form input tags of date_field, time_field and date_time field, which you can read about at <a href="http://api.rubyonrails.org/classes/ActionView/Helpers/FormHelper.html">api.rubyonrails.org - FormHelper</a>. If you change the scaffold generated form fields to date_field, time_field, and datetime_field, your form fields will look like this:</p>
+<pre>
+# app/views/events/_form.html.erb
+&lt;div class="field">
+  &lt;%= form.label :held_on %>
+  &lt;%= form.date_field :held_on %>
+&lt;/div>
+&lt;div class="field">
+  &lt;%= form.label :start_time %>
+  &lt;%= form.time_field :start_time %>
+&lt;/div>
+&lt;div class="field">
+  &lt;%= form.label :starts_at %>
+  &lt;%= form.datetime_field :starts_at %>
+&lt;/div>
+</pre>
+<p>If you were to inspect the form's HTML with Chrome Dev Tools you would see the date input field is converted to the below HTML element, and similar for time and datetime: </p>
+<pre>
+&lt;input type="date" name="event[held_on]" id="event_held_on">
+</pre>
+<p>Chrome, MS Edge, and iOS and Android browsers have native date and time pickers for these fields. The old IE browsers, and significantly Safari do not have native date and time pickers for these fields. Firefox has it for date and time but not datetime. In browsers without native datetime pickers these fields are treated as text fields. Without datetime picker support across all major browsers this option is simply unavailable. But the truth is the UI does not look that great in the desktop browsers anyway and is not controllable. If you changed the form to the above and refresh your browser and you'll see what I mean.</p>
+
+<hr class="space">
+<h3>Tempus Dominus Bootstrap 4 form fields</h3>
+<p>Tempus Dominus to the rescue. Lets start with the date and time fields. Change the form fields to the below. This comes straight from <a href="tempusdominus.github.io/bootstrap-4/Usage/">tempusdominus.github.io/bootstrap-4/Usage</a> with Rails erb added in. 
+<li>Use the text input field type.</li>
+<li>The datepicker4 and datepicker3 are the id names used in the above linked documentation, but they could be any name as long as they align with the JavaScript target that we'll add next.</li> 
+<li>We'll set the value to the existing value if there is one using a ternary statement and to nil if there isn't. You can use the more specific @event instead of the generic form.object if you like. We need to convert the datetime formats to the ones we'll be setting in the JavaScript using the Ruby strftime method.</li>
+<li>The date and time pickers appear when the user clicks on the calendar or clock icons. This gives the user the option to directly change the value in the input box or use the picker.</li></p>
+<pre>
+# app/views/events/_form.html.erb
+&lt;div class="row">
+  &lt;div class="col-md-6">
+    &lt;div class="form-group">
+      &lt;%= form.label :held_on, "Date", class: 'control-label' %>        
+      &lt;div class="input-group date" id="datetimepicker4" data-target-input="nearest">
+        &lt;%= form.text_field(:held_on, 
+          value: form.object.held_on ? form.object.held_on.strftime('%B %d, %Y') : nil, 
+          class: "form-control datetimepicker-input", data: {target:"#datetimepicker4"}) %>
+        &lt;div class="input-group-append" data-target="#datetimepicker4" data-toggle="datetimepicker">
+          &lt;div class="input-group-text">&lt;span class="fas fa-calendar-alt">&lt;/span>&lt;/div>
+        &lt;/div>
+      &lt;/div>
+    &lt;/div>
+  &lt;/div>  
+  &lt;div class="col-md-6">
+    &lt;div class="form-group">
+      &lt;%= form.label :start_time, "Start Time", class: 'control-label' %>        
+      &lt;div class="input-group date" id="datetimepicker3" data-target-input="nearest">
+        &lt;%= form.text_field(:start_time, 
+          value: form.object.start_time ? form.object.start_time.strftime('%I:%M %p') : nil, 
+          class: "form-control datetimepicker-input", data: {target:"#datetimepicker3"}) %>
+        &lt;div class="input-group-append" data-target="#datetimepicker3" data-toggle="datetimepicker">
+          &lt;div class="input-group-text">&lt;span class="far fa-clock">&lt;/span>&lt;/div>
+        &lt;/div>
+      &lt;/div>
+    &lt;/div>
+  &lt;/div>
+&lt;/div>
+</pre><br>
+
+<h3>JavaScript</h3>
+<p>You need to add some JavaScript to the events.js file. You can see all the available options at <a href="https://tempusdominus.github.io/bootstrap-4/Options/">tempusdominus.github.io/bootstrap-4/Options/</a>.
+<li>I'm using jQuery only because that's what's used in the documentation examples, and it's a dependency.</li>
+<li>We'll set it to fire on turbolinks load.</li>
+<li>The default date format that Tempus Dominus uses is MM/DD/YYYY which Rails interprets as DD/MM/YYYY. So we have to change it using the format option. Tempus Dominus uses the Moment.js library for manipulating date formats. You can see the format syntax at <a href="http://momentjs.com/docs/#/displaying/format/">momentjs.com/docs/#/displaying/format</a>.</li>
+<li>We are also setting the minimum date to the current date and the maximum date to one year from now using the JavaScript Date function.</li> 
+<li>We're using the icons option to select Font Awesome version 5 icon names. If you are using FA4 you can skip this.</li> 
+<li>We'll include a close button.</li> 
+<li>The Stepping option for the time picker specifies how many minutes each up/down arrow skips.</li> </p>
+<pre>
+# app/assets/javascripts/events.js
+$(document).on('turbolinks:load', function() {
+  $('#datetimepicker4').datetimepicker({
+    format: 'MMMM D, YYYY',
+    minDate: Date(),
+    maxDate: new Date(Date.now() + (365 * 24 * 60 * 60 * 1000)),
+    icons: {
+      up: 'fas fa-arrow-up',
+      down: 'fas fa-arrow-down',
+      previous: 'fas fa-chevron-left',
+      next: 'fas fa-chevron-right',
+      close: 'fas fa-times'
+    },
+    buttons: {showClose: true }
+  });
+
+  $('#datetimepicker3').datetimepicker({
+    format: 'LT',
+    stepping: 15,
+    icons: {
+      up: 'fas fa-arrow-up',
+      down: 'fas fa-arrow-down',
+      close: 'fas fa-times'
+    },
+    buttons: {showClose: true}  
+  });
+});
+</pre><br>
+
+<h3>DateTime Field</h3>
+<p>The datetime field uses the same concepts as above.</p>
+<pre>
+# app/views/events/_form.html.erb
+&lt;div class="row">
+  &lt;div class='col-md-6'>
+    &lt;div class='form-group'>
+      &lt;%= form.label :starts_at, 'Start Date and Time', class: 'control-label' %>&lt;br>
+      &lt;div class="input-group date" id="datetimepicker1" data-target-input="nearest">
+        &lt;%= form.text_field(:starts_at, 
+          value: form.object.starts_at ? form.object.starts_at.strftime('%B %d, %Y %I:%M %p') : nil, 
+          class: "form-control datetimepicker-input", data: {target:"#datetimepicker1"}) %>
+        &lt;div class="input-group-append" data-target="#datetimepicker1" data-toggle="datetimepicker">
+          &lt;div class="input-group-text">&lt;i class="fas fa-calendar-plus">&lt;/i>&lt;/div>
+        &lt;/div>
+      &lt;/div>
+    &lt;/div>
+  &lt;/div>
+  &lt;div class='col-md-6'>
+    &lt;div class='form-group'>
+      &lt;%= form.label :ends_at, 'End Date and Time', class: 'control-label' %>&lt;br>
+      &lt;div class="input-group date" id="datetimepicker2" data-target-input="nearest">
+        &lt;%= form.text_field(:ends_at, 
+          value: form.object.ends_at ? form.object.ends_at.strftime('%B %d, %Y %I:%M %p') : nil, 
+          class: "form-control datetimepicker-input", data: {target:"#datetimepicker2"}) %>
+        &lt;div class="input-group-append" data-target="#datetimepicker2" data-toggle="datetimepicker">
+          &lt;div class="input-group-text">&lt;i class="fas fa-calendar-plus">&lt;/i>&lt;/div>
+        &lt;/div>
+      &lt;/div>
+    &lt;/div>
+  &lt;/div>
+&lt;/div>
+</pre>
+
+<p>The corresponding JavaScript is below.</p> 
+<li>We'll link the starts_at and ends_at fields so that a user can't enter an end date before the start date or a start date after the end date.</li> 
+<li>function (e) is triggered by a change event on the datepicker value.</li>
+<li>The sideBySide option makes the form much more readable than the default in my opinion.</li><br>
+<h3>DateTime JavaScript</h3>
+<pre>
+# app/assets/javascripts/events.js
+$('#datetimepicker1').datetimepicker({
+  format: 'MMMM D, YYYY h:mm A',
+  stepping: 15,
+  minDate: Date(),
+  maxDate: new Date(Date.now() + (365 * 24 * 60 * 60 * 1000)),
+  sideBySide: true,
+  icons: {
+    up: 'fas fa-arrow-up',
+    down: 'fas fa-arrow-down',
+    previous: 'fas fa-chevron-left',
+    next: 'fas fa-chevron-right',
+    close: 'fas fa-times'
+  },
+  buttons: {showClose: true }
+});
+
+$('#datetimepicker2').datetimepicker({
+  format: 'MMMM D, YYYY h:mm A',
+  stepping: 15,
+  useCurrent: false,
+  sideBySide: true,
+  icons: {
+    up: 'fas fa-arrow-up',
+    down: 'fas fa-arrow-down',
+    previous: 'fas fa-chevron-left',
+    next: 'fas fa-chevron-right',
+    close: 'fas fa-times'
+  },
+  buttons: {showClose: true }
+});
+$("#datetimepicker1").on("change.datetimepicker", function (e) {
+  $('#datetimepicker2').datetimepicker('minDate', e.date);
+  console.log(e.date);
+});
+$("#datetimepicker2").on("change.datetimepicker", function (e) {
+  $('#datetimepicker1').datetimepicker('maxDate', e.date);
+});
+</pre>
+
+<hr class="space">
+<h3>Wrap up</h3>
+<p>To change the date or time format you need to change both the JavaScript datepicker format option using the  <a href="http://momentjs.com/docs/#/displaying/format/">moment.js format function</a>  and the value attribute in the form using the corresponding Ruby <a href="https://ruby-doc.org/core/Time.html#method-i-strftime">strftime method directives</a>.</p> 
+<p>Setting default values for time and date turned out to be tricky. You can set the datetimepicker defaultDate option or set a default value in the form field value attribute in place of nil in the above examples. However, neither of these methods worked consistently, meaning they would work then inexplicably stop working so I left it out of the tutorial. Hopefully that's just a bug that gets fixed in later versions.
+</p>
+</div>
+</div>
+</body>
+</html>

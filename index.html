@@ -1,41 +1,50 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>LocalNight</title>
-    <link href="images/favicon.ico" rel="icon" type="image/x-icon">
-    <link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
-    <link rel='stylesheet' href='stylesheets/style.css' />
-  </head>
+<head>
+  <title>Tech & Startup</title>
+  <link href="images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
+  <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD" crossorigin="anonymous"> -->
+  <link rel="stylesheet" href="stylesheets/style.css">
+  <script src="bootstrap/js/bootstrap.bundle.min.js"></script>
+  <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js" integrity="sha384-w76AqPfDkMBDXo30jS1Sgez6pr3x5MlQ1ZAGC+nuZB+EYdgRZgiwxhTBTkF7CXvN" crossorigin="anonymous"></script> -->
+
+  <script src="javascripts/includes.js" defer></script>
+</head>
   <!-- <body class="d-flex flex-column min-vh-100 body-bg"> -->
   <body class="body-bg">
-    <nav class="navbar navbar-expand-lg navbar-dark">
-      <div class="container">
-        <a href="/" class="navbar-brand">Tech And Startup</a>       
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-        </button>
-      </div>
-    </nav>
-<h1 class="text-center">Tech and Startup</h1>
-<a href="page2.html">Go to page 2.</a><br>
-<a href="https://techandstartup.github.io/techandstartup-html/page2.html">Go to page 2 (full path).</a><br>
-<a href="https://techandstartup.github.io/techandstartup-html/page2">Go to page 2 (no .html extension).</a><br>
-<a href="page3">Go to page 3.</a><br>
-<a href="page3/index.html">Go to page 3.</a><br>
-<img src="images/dom.jpg" alt="Dom diagram" width="800">
+    <header id="header"></header>
+    <div class="container">
 
-<footer class="footer">
-  <div class="container">
-    <small>
-      Copyright &copy; 2023 Tech and Startup
-    </small>
-    <!-- <nav>
-      <ul>
-        <li><a href="">About</a></li>
-        <li><a href="">Contact</a></li>
-      </ul>
-    </nav> -->
+<div class="page-header">
+  <h1>Tech & Startup projects</h1>
+  <p>The purpose of this site is to host tech and startup related projects that provide solutions for unfilled needs.</p>
   </div>
-</footer>
+  
+  <h3>
+    Project 1: Universal Guide to Web Development - Node.js
+    <a href="nodejs_guides" class="btn btn-outline-primary btn-sm">Go to guide</a>
+  </h3>
+  <img src="images/nodejs-logo200x123.png" alt="Nodejs logo" class="img-fluid float-right my-2 ml-2">
+  <p>Our initial project is to provide a universal guide for website and API development for mid-sided or above projects.</p> 
+  <h4>Goals</h4>
+  <ol>
+    <li>One stop shop for creating a web app or API.</li>
+    <li>Every programming choice is well reasoned and peer reviewed.</li>
+    <li>Always up-to-date.</li>
+    <li>As fast to prototype in as Ruby on Rails.</li>
+  </ol>
+  <h4>Why Node.js?</h4>
+  
+  <p>There are dozens of programming language and web framework combinations to choose from to build a web application. Some of the most popular ones are Ruby on Rails, Python and Django, Java and Spring, PHP and Laraval, C# and .net, and JavaScript with Node.js and Express. Of those we recommend all web developers learn Node.js with Express as their primary or secondary web development stack. 
+  <p>Why? First, because Node.js uses JavaScript as it's programming language. All full stack web developers need to know JavaScript for the front end. The advantage of using the same language for both the front and back end is self evident. No overhead of learning a new language or switching back and forth between languages.</p> 
+  <p>Second, Node.js is fast. It is built on top of Google's V8 engine that powers the Chrome browser. Google has deep pockets, top talent, and a stake in keeping V8 (and by extention Node.js) as fast as possible.</p>
+  <p>Third, the Express.js web framework is light weight and unopinionated. Less code means a faster framework. It also means less opaque magic going on in the background. Opinionated frameworks are great, but they lock you into their way of doing things. If you need to make a significant change it can be much more difficult than with a light weight framework like Express.</p>
+  <p>A light-weight unopinionated framework like Express has two big downsides though. First, it does a lot less out-of-the-box than a full service framework like Ruby on Rails. Rails is famous for it's ability to quickly prototype ideas using it's built-in generators. Second, being unopinionate, Node.js apps are not structured in a consistent manner. The same problems are solved in many different ways.</p>
+  <p>It is those downsides that this project aims to address. By researching and publishing well reasoned solutions to common problems. And by keeping them peer reviewed and continually updated, we hope to provide a service that all web developers can turn to, contribute to, and trust.</p>
+  <p>This doesn't mean Node.js is the right solution for all websites. Small business or local organization websites that have low volume should use none of those web stacks, but rather a content management system like Wordpress which requires no programming at all. And someone who is already a Python expert may be most at home with a Python based framework like Django or Flask. A Ruby on Rails expert may be best served continuing to use Ruby on Rails. But if there was one language and framework stack that all web devs should know in addition to any others they may know or like, we believe this is it.</p>  
 
+<footer id="footer" class="footer"></footer>
+</div>
 </body>
 </html>

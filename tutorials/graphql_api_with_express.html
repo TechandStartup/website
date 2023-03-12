@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Build a GraphQL API with Node.js, Express and MongoDB Tutorial</title>
+  <meta name="description" content="Part 1 of a 2 part series on building a MERN (Mongo-Express-React-Node) app with all four CRUD actions (Create-Read-Update-Delete) using GraphQL."> 
+  <meta name="keywords" content="GraphQL, MERN App, Node.js, Express, MongoDB, React, CRUD app, tutorial">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h2>Build a GraphQL API with Node.js, Express, and MongoDB Tutorial</h2>
+  <p>Part 1 of a 2 part series on building a MERN (Mongo-Express-React-Node) app with all four CRUD actions (Create-Read-Update-Delete) using GraphQL.</p>
+  <p>By Steve Carey - 7/24/2019</p>
+  <p>Part 2: <a href="react_app_with_graphql">Build a React app with GraphQL Tutorial</a></p>
+  <p>Finished code: <a href="https://github.com/steve981cr/mern-app-with-graphql">Github</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<h2 id='setup'>Project Setup</h2>
+<p>The emphasis of this tutorial is on how to use GraphQL to execute all four CRUD actions in the context of a MERN stack. Part 1 covers the API and can be done without doing Part 2.</p> 
+<p>Most readers will likely be at least somewhat familiar with the MERN stack, but you should be able to build the API even if you are new to it and to GraphQL. I only assume, since you are here, that you know what GraphQL is. You should, however, be comfortable using the command line, and you need to have Node.js installed. Let's get started.</p>
+<p><b>Express-graphql vs. Apollo-server:</b> We will be using the express-graphql package to create the GraphQL HTTP server and connect it to a Node application using the Express web framework. Express-graphql was originally created by Facebook and was spun off with the rest of GraphQL to the GraphQL Foundation. Another option is to use the apollo-server package as the GraphQL HTTP server. It is part of the suite of software products built by Apollo for GraphQL. For this small app either works fine and has similar code. Apollo-server has some added features such as server side caching. To see this same tutorial using Apollo-server go to <a href="graphql_api_with_apollo_server">Build a GraphQL API with Node.js and Apollo-Server Tutorial</a>.</p>
+<p>A note on syntax. Node recognizes most, but not all, ES6 syntax. Notably it does not recognize import/export statements, so we won't use them here. While we won't do it in this tutorial, you have the option of installing Babel which will transpile ES6 to ES5 for you at run time. Also, as default I am using the declaration syntax for functions rather than arrow functions. That's because they require explicit return statements which makes the code a little bit clearer.</p>
+
+<p class='mb-1'>Create a directory for your project and cd into it. We'll call it mern-app-with-graphql (or whatever name you prefer to use).</p>
+<li class="dlr"><code>mkdir mern-app-with-graphql && cd mern-app-with-graphql</code></li>
+<p class='mt-3 mb-1'>Create the files for our API. You can use these UNIX commands from the command line, or do it in your text editor. Mkdir creates a directory and touch creates a file.</p>
+<pre>
+touch server.js
+mkdir models
+touch models/article.js
+mkdir graphql
+touch graphql/schema.js
+touch graphql/resolvers.js
+</pre>
+
+<hr>
+<h4>Package.json</h4>
+<p class='mb-1'>Generate a <a href="https://docs.npmjs.com/files/package.json">package.json file</a>. This file contains the metadata for a Node.js project. Adding the --yes flag (-y for short) will use the defaults for the fields.</p>
+<li class="dlr"><code>npm init -y</code></li>
+<p class='mt-3 mb-1'>Install our npm packages. First the global packages. These get installed on your system and not attached to any specific project. The Nodemon package will allow you to do hot reloading of the app, which means it will restart the server every time you make a change and save it in your project. The --global or -g flag makes it global. If you already have it installed this will upgrade it to the latest version.</p>
+<li class="dlr"><code>npm install -g nodemon</code></li>
+<p class='mt-3 mb-1'>Local packages will be installed directly in your project in the node_modules folder. Install the following packages: </p>
+<li class="dlr"><code>npm install express mongoose graphql express-graphql</code></li>
+<ul>
+  <li>Express is a lightweight web framework.</li>
+  <li>Mongoose is middleware for connecting to the MongoDB database in an object oriented manner.</li>
+  <li>Graphql (the npm package) is the JavaScript implementation of GraphQL.</li>
+  <li>Express-graphql creates a GraphQL HTTP server and connects with the Express web framework.</li>
+</ul>
+
+<p>Your package.json file should look something like the below. A list of the project's installed packages with version and their dendencies is saved under dependencies. If we ran <code>npm install</code> then npm would attempt to install or update the packages listed there.</p>
+<p>Make sure the "main" property's value is "server.js". Change it if it isn't.</p>
+<p>Also make sure you have the "start" script. Add it if you don't. We can run the commands in the scripts object from the command line with <code>npm run <i>script-name</i></code>. I'll explain more in the next section.</p>
+<pre>
+<span>// package.json</span>
+{
+  "name": "mern-app-with-graphql",
+  "version": "1.0.0",
+  "description": "Web API built with Node.js, Express, MongoDB, and GraphQL",
+  <b>"main": "server.js",</b>
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    <b>"start": "node server.js"</b>
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.17.1",
+    "express-graphql": "^0.9.0",
+    "graphql": "^14.4.2",
+    "mongoose": "^5.6.6"
+  }
+}
+</pre>
+
+<p>You will also see a file named package-lock.json. That lists all the project's installed packages with their versions and their dendencies.</p>
+
+<hr>
+<h2 id="express">Express Web Framework</h2>
+<h4>Server.js</h4>
+<p>Populate the server.js file with a hello world app powered by Express:</p>
+<pre>
+<span>// server.js</span>
+const express = require('express');
+const app = express();
+const PORT = 3001;
+
+app.get('/', function(request, response) { response.send('Hello World!') });
+
+app.listen(PORT, function() {console.log(`Server listening on port ${PORT}`) });
+</pre>
+<p class='mt-3'>This simple file, with the Express library, will create a server.</p>
+<h4>Start the Server</h4>
+<p class='mb-1'>Now that you have a server for your app, there are a few different commands you can use to run it. I'll cover them briefly. First there is a standard node command to execute any file:</p>
+<li class="dlr"><code>node server.js</code> or just <code>node server</code></li>
+<p>This should log "Server listening on port 3001" in the terminal, and if you open a browser to localhost:3001 you should get "hello world". To stop the server, from the terminal press CTRL+C,</p>
+<p class='mb-1'>NPM init generated a script to run this command in our package.json file. You call the scripts in your package.json file with <code>npm run <i>script-name</i></code> or in a few cases "run" is optional.</p>
+<li class="dlr"><code>npm start</code></li>
+<p class='mt-3 mb-1'>The third way to execute the server.js file is to use the nodemon command. We installed nodemon for hot reloading. To use it just enter <code>nodemon</code> and it looks for a file named server.js to run by default. This is the command we'll use throughout this tutorial.</p>
+<li class="dlr"><code>nodemon</code></li>
+
+<hr>
+<!-- Mongo Database -->
+<div id="mongo"></div>
+<script>
+const partial = document.getElementById('mongo');
+fetch('_mongo.html')
+  .then((response) => response.text())
+  .then((body) => partial.innerHTML = body);
+</script>
+<!-- db.articles.insert({title: "Learn Node.js", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."}) -->
+
+<hr>
+<h4>Mongoose ORM</h4>
+<p>We installed the mongoose package in our app. Mongoose is a middleware library that performs the Object Relational Mapping (ORM) between our Express application and MongoDB. In essence it does the translations allowing them to talk to each other.</p>
+
+<p>We'll start by using Mongoose to connect to MongoDB in our server file. Let's replace the hello world response with our real code and then we'll go through it line by line. We'll include all the code we need for this file, but will skip over the cors and graphQL explanations for now.</p>
+<pre>
+<span>// server.js</span>
+
+const express = require('express'); <span>                           #1</span>
+const mongoose = require('mongoose');
+// const cors = require('cors');
+const graphqlHTTP = require('express-graphql');
+const schema = require('./graphql/schema');
+const resolvers = require('./graphql/resolvers');
+
+const app = express(); <span>                                        #2</span>
+const PORT = 3001; <span>                                            #3</span>
+const MONGODB_URI = "mongodb://localhost:27017/my_local_db";   <span>#4</span>
+
+// app.use(cors());
+
+mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useFindAndModify: false }); <span>#5</span>
+mongoose.connection.once('open', function() { <span>                 #6</span>
+  console.log('Connected to the Database.');
+});
+mongoose.connection.on('error', function(error) {
+  console.log('Mongoose Connection Error : ' + error);
+});
+
+app.use("/graphql", graphqlHTTP({
+  schema: schema,
+  rootValue: resolvers,
+  graphiql: true
+}));
+
+app.listen(PORT, function() { <span>                                #7</span>
+  console.log(`Server listening on port ${PORT}.`);
+});
+</pre>
+<ol>
+<li>Start by importing our express, mongoose and cors packages, and our Express router which we'll define shortly.</li>
+<li>Calling the express() function will create our running app object.</li>
+<li>PORT: The Express listen method called at the bottom of our file uses 3000 as it's default port for it's server. We'll declare a new PORT constant. Assigning constants for things like port number and the database URL gives us the flexibility to change the values in one place depending on whether we are in development or production environments.</li>
+<li>MONGODB_URI:<br>
+  If you are using the MongoDB Atlas cloud database then paste the link there.<br>
+  If you are using the local version, MongoDB is accessed through localhost on port 27017 by default, and the path is the database name. We'll just call ours my_local_db.</li>
+<li><code>mongoose.connect()</code> connects to your MongoDB database. The useNewUrlParser and useFindAndModify options are Mongoose requirements for some deprecation transitions. You'll get a warning if you leave them out.</li>
+<li>Optionally, log a message if the above connection was successful and one if it is not.</li>
+<li>Chain the Express <a href="http://expressjs.com/en/api.html#app.listen_path_callback">listen method</a> to our app. This will listen for connections on the specified port.</li>
+</ol>
+
+<h4>Cors</h4>
+<p>Let's talk briefly about Cross-Origin Resource Sharing (CORS). By default Express will block cross-origin HTTP requests for security reasons. Cross-origin means the request is from a different origin (domain, protocol, and/or port) than its own origin. Our API is served on localhost port 3001. If our API is accessed by mobile apps for example they will be on a different origin and any requests will be rejected by default. To allow access from any origin (or from origins that you specify) you can install and configure an npm package called cors. That will apply additional HTTP headers to tell the browser to allow cross-origin access.</p>
+<p>A standard MERN app is really an integrated single web application even if the back end and front end run independently. In our app we only want to give access to the integrated front end (our React client in this case). When we create the Client we'll make our API a proxy for that app (explained later) and therefore won't need the cors package.</p>
+<p class='mb-1'>If you also want the API to be accessed by mobile apps or other websites then you need to install the cors middleware package and connect it to your app.</p>
+<li class="dlr"><code>npm install cors</code></li>
+<p class='mt-3'>The server.js file comments out the cors package import and where it is applied to the app. To allow cross origin access uncomment those lines.</p>
+<p>For more on the CORS concept see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS">developer.mozilla.org/en-US/docs/Web/HTTP/CORS</a></p>
+
+<h4>The Model</h4>
+<p>Populate the model file with the below:</p>
+<pre>
+<span>// models/article.js</span> 
+
+const { Schema, model } = require('mongoose');
+
+const articleSchema = new Schema({ <span>               #1</span>
+  title: {
+    type: String,
+    required: true
+  },
+  content: {
+    type: String,
+    required: true
+  }
+});
+
+module.exports = model('Article', articleSchema); <span>#2</span>
+</pre>
+<ol>
+  <li>A database schema is it's structure. The mongoose schema is a prototype that maps to a MongoDB collection and defines the shape of the documents within that collection. Here we are creating an instance of mongoose.Schema that defines two fields with type set to String and making them required. Mongoose Schema reference: <a href="https://mongoosejs.com/docs/guide.html">mongoosejs.com/docs/guide.html</a>.</li>
+  <li>
+    Models represent the data in an application. A mongoose model is a constructor function that creates and reads documents to and from the underlying MongoDB database. The first argument is the singular uppercase name of your database collection. So Article represents the articles MongoDB collection. The second argument is the schema which we defined above. An individual article is an instance of the Article model.
+  </li>
+</ol>
+
+<hr>
+<h2 id="routes">GraphQL</h2>
+<p>If you are brand new to GraphQL I recommend going through the Getting Started tutorial on their website <a href="https://graphql.org/graphql-js/">https://graphql.org/graphql-js</a>. This tutorial is the next level up from where that ends. I won't repeat the basics here but will apply them to a real (albeit super basic) application with an actual database. And use all four CRUD operations.</p>
+
+<p>I skipped over explaining the GraphQL specific code in the server.js file so I'll cover it now:</p>
+<pre>
+<span>// server.js</span>
+
+const graphqlHTTP = require('express-graphql'); <span>#1</span>
+const schema = require('./graphql/schema');
+const resolvers = require('./graphql/resolvers');
+...
+app.use("/graphql", graphqlHTTP({               <span>#2</span>
+  schema: schema,                               <span>#3</span>
+  rootValue: resolvers,
+  graphiql: true
+}));
+</pre>
+<ol>
+<li>We imported the express-graphql package which will set up our GraphQL HTTP server.</li>
+<li>Chaining Express's <a href="http://expressjs.com/en/api.html#app.use">use method</a> to our app object gives us access to the packages we imported. Express is connecting the "/graphql" endpoint to our graphQL HTTP server. This is the one and only route on our API. This is the fundamental difference between GraphQL and a REST API. REST APIs have different URL endpoints for different HTTP requests. GraphQL has one endpoint for all requests. We will send queries and mutations to that endpoint to read and write data.</li>
+<li>GraphqlHTTP takes an object argument with a required schema property.</li>
+</ol>
+<p>Let's start by creating the GraphQL Schema. We already created a schema in models/article.js for interfacing with MondoDB. But since GraphQL is not tied to any particular database it needs it's own schema to work with. Populate the GraphQL Schema file with the below:</p>
+<pre>
+<span>// graphql/schema.js</span>
+
+const{ buildSchema } = require('graphql'); <span>   #1</span>
+
+const schema =  buildSchema(` <span>                #2</span>
+type Article { <span>                               #3</span>
+  id: ID!
+  title: String!
+  content: String!
+}
+input ArticleInput { <span>                         #4</span>
+  title: String!
+  content: String!
+}
+type Query { <span>                                 #5</span>
+  article(id: ID!): Article
+  articles: [Article]
+}
+type Mutation { <span>                              #6</span>
+  createArticle(articleInput: ArticleInput): Article
+  deleteArticle(id: ID!): Article
+  updateArticle(id: ID!, articleInput: ArticleInput): Article!
+}
+schema { <span>                                     #7</span>
+  query: Query
+  mutation: Mutation
+}
+`)
+
+module.exports = schema; <span>                     #8</span>
+</pre>
+<ol>
+<li>Import the buildSchema utility from the graphql library.</li>
+<li>BuildSchema creates a GraphQLSchema object from the GraphQL schema language, which is structured like JSON. You pass it in as one big string.</li>
+<li>GraphQL, unlike JavaScript, is strongly typed meaning you have to explicitly specify the data types. Here we are defining Article as a type. And we are specifying it's fields, and what each field's data type is. The GraphQL schema language supports the scalar types of String, Int, Float, Boolean, and ID. Adding ! at the end means the field is required.</li>
+<li>We'll use an input for our Create and Update mutations. Set required string fields for title and content.</li>
+<li>List the queries we will accept and what will be returned. So here we accept a query called article with id as it's parameter that returns the Article type defined above. We also accept a query called articles and return an array of the Article type defined above. Putting Article in brackets signifies that it will be an array of articles. "Article" and "articles" are the names of resolver functions that will make the actual queries to the the mongoDB database and return the results. We could define them in this file but we'll define them in a separate resolver file.</li>
+<li>Mutations are HTTP requests to modify data. We'll define three, which will call resolver functions to create, delete, and update an Article.</li>
+<li>Put the query and mutation objects inside a schema object.</li>
+<li>Export the schema object for it to be used as the schema for our graphqlHTTP server.</li>
+</ol>
+
+<p>Returning to the server.js file, the graphqlHTTP server takes an optional rootValue property. This is where we will define our resolver functions for each API endpoint.</p>
+<pre>
+const graphqlHTTP = require('express-graphql');
+const schema = require('./graphql/schema');
+<b>const resolvers = require('./graphql/resolvers');</b>
+...
+app.use("/graphql", graphqlHTTP({
+  schema: schema,
+  <b>rootValue: resolvers,</b>
+  graphiql: true
+}));
+</pre>
+
+<p>In a REST API the endpoints are separate HTTP verb/URL path combinations like GET /articles, POST /articles, DELETE /articles/:id, etc. But with a GraphQL API there is only one such combination: POST /graphql. Instead our endpoints are represented by individual resolver functions. These functions are where we interact with the database. In our case it is MongoDB with Mongoose.js as our ORM. Let's define these now:</p>
+
+<pre>
+<span>// graphql/resolvers.js</span>
+
+const Article = require('../models/article'); <span>                                 #1</span>
+
+function articles() { <span>                                                         #2</span>
+  return Article.find({});
+}
+
+function article(args) {
+  return Article.findById(args.id)
+}
+
+function createArticle(args) {
+  let article = new Article(args.articleInput);
+  return article.save();
+}
+
+function deleteArticle(args) {
+  return Article.findByIdAndRemove(args.id);
+}
+
+function updateArticle(args) {
+  return Article.findByIdAndUpdate(args.id, args.articleInput, { new: true }); <span>#3</span>
+}
+
+module.exports = { articles, article, createArticle, deleteArticle, updateArticle }
+</pre>
+<ol>
+<li>Import the Article model which connects us to the database.</li>
+<li>There is one resolver function per API endpoint. Each performs a CRUD action on the database and returns the result. The find, findById, save, findByIDandRemove, and findByIdAndUpdate are all methods from the Mongoose ORM.</li>
+<li>The <i>Model</i>.findByIdAndUpdate(<i>id, update, options, callback</i>) method returns the original document by default not the updated one. To return the updated object you need to add the {new: true} option.</li>
+</ol>
+
+<hr>
+<h4>Test the API with Graphiql</h4>
+<p>Returning to the graphqlHTTP object in our server.js file, the last property we are setting is:</p>
+<pre>
+app.use("/graphql", graphqlHTTP({
+  schema: schema,
+  rootValue: resolvers,
+  <b>graphiql: true</b>
+}));
+</pre>
+<p class='mb-1'>Graphiql is a web interface where you can send queries and mutations to the API. Make sure the server is running and you can test out the API.</p>
+<li class="dlr"><code>nodemon</code></li>
+<p class='mt-3'>Open the browser to <b>localhost:3001/graphql</b>. There you'll see the graphiql API interface. In the panel on the left enter the createArticle mutation:</p>
+<pre>
+mutation {
+  createArticle(articleInput: { title: "Learn GraphQL", content: "Blah blah."}) {
+    id, title, content
+  }
+}
+</pre>
+<p>This mutation will call the createArticle endpoint we defined on the resolvers file, passing in the articleInput object with values for the title and content properties. The property names in the curly braces are what we want returned if the mutation is successful. Click the execute button on the upper left and you should see the output on the panel to the right.</p>
+<p>Change the title and press it again so we have another article.</p>
+<p>Now let's do a query to to see our articles:</p>
+<pre>
+query {
+  articles {
+    title
+    content
+    id
+  }
+}
+</pre>
+<p>Press the execute button and you should see the articles you created. Copy the id of one of them and enter another query. (Note: query is the default type so you can leave off the word "query" if you like).</p>
+<pre>
+query {
+  article(id: "<i>article-id-here</i>") {
+    id
+    title
+    content
+  }
+}
+</pre>
+<p>Update that same article:</p>
+<pre>
+mutation {
+  updateArticle(id: "<i>article-id-here</i>", articleInput: { title: "Learn MongoDB", content: "Blah blah." }) {
+    id, title, content
+  }
+}
+</pre>
+<p>Click execute and you should get the updated article back. <br>
+And finally, send a delete mutation:</p>
+<pre>
+mutation {
+  deleteArticle(id: "<i>article-id-here</i>") {
+    id, title, content
+  }
+}
+</pre>
+<p>Click execute and it should return the article after deleting it. There is a history button on the top and if you click it you should see all the queries and mutations you ran. Click on the articles query then execute it. The deleted article should be gone.</p>
+<p>There is a Docs menu on the right of the tool that lists all your query and mutation endpoints. You can drill down on it to see the available fields.</p>
+
+<p>If you are familiar with the Postman API query tool, recent versions have a GraphQL feature that allows you to do these same queries/mutations. It has the added advantage of being able to save your queries, but the disadvantage of not having the Docs menu that shows all your endpoints.</p>
+
+<hr>
+<p>Welp, that wraps up the API portion of our MERN with GraphQL CRUD application tutorial. If you want to add a React front end then on to part 2 <a href="react_app_with_graphql">Build a React app with GraphQL Tutorial</a></p>
+
+</div>
+</div>
+</body>
+</html>

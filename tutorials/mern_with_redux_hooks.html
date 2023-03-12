@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>MERN with React Hooks Tutorial</title>
+  <meta name="description" content="Tutorial on how to build a web app using the MERN stack with React and Redux hooks. This is a full CRUD (Create-Read-Update-Delete) app with a RESTful API."> 
+  <meta name="keywords" content="Node API, MERN App, CRUD app, RESTful API, Node.js, Express, MongoDB, React, React Hooks, Redux, React-redux hooks">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>MERN App: Integrate React and Redux with Hooks</h1>
+  <p>Integrate React and Redux with Hooks into an API built with Node.js, Express and MongoDB. This is a full Create-Read-Update-Delete (CRUD) app with a corresponding RESTful API.</p>
+  <p>By Steve Carey - 7/19/2019</p>
+  <p>Part 1 of this tutorial: <a href="express_mongo_api">Build an API with Node.js, Express and MongoDB Tutorial</a></p>
+  <p>Finished code: <a href="https://github.com/steve981cr/mern-with-redux-hooks">Github</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<h2>Introduction</h2>
+<p>This is part two of a tutorial on building a MERN web app. In this tutorial we will integrate a React with Redux front end application into an API built with Node.js, the Express web framework and the MongoDB database. Part 1 is linked above. There is an optional part 3 where we <a href="mern_heroku">deploy the app to Heroku</a>. It incorporates all the CRUD database actions of Creating records, Reading records, Updating records, and Deleting records. It uses a RESTful API which essentially means that the API's endpoints correspond with the CRUD actions.</p>
+<p>This tutorial uses the Hooks API which is a new feature in React as of version 16.8 (released February 2019) and React-redux as of version 7.1 (released June 2019). Hooks allow you to use state and lifecycle methods in functional rather than class components for shorter, cleaner code. To read more about React hooks go to <a href="https://reactjs.org/docs/hooks-intro.html">reactjs.org/docs/hooks-intro.html</a>.</p>
+
+<p>This tutorial assumes you are familiar with React but not necessarily with React hooks. It assumes only limited knowledge of Redux.</p>
+
+<!-- redux_hooks -->
+<hr class="space" id='react'>
+<h2 id='react-redux'>Set up a React app with Redux</h2>
+<p>We will install our react app in a directory called "client" inside our API's root directory. Use create-react-app to set up a React app.</p>
+<li class="dlr"><code>create-react-app client</code></li>
+<p class="dlr"><code>cd client</code></p>
+<p>Install your packages:</p>
+<p class="dlr"><code>yarn add redux react-redux redux-thunk redux-logger react-router-dom axios bootstrap</code></p>
+<ul>
+  <li><b>Redux</b>: Creates a centralized object to store and access you application's current state. Docs: <a href="https://redux.js.org/basics">redux.js.org/basics</a></li>
+  <li><b>React-Redux</b>: Connects React Components with Redux store. Docs <a href="https://github.com/reduxjs/react-redux/blob/master/docs/api.md#api">github.com react-redux</a></li>
+  <li><b>Redux-Thunk</b>: Middleware that allows you to create asynchronous Redux actions that can wait for an API response. Docs: <a href="https://github.com/reduxjs/redux-thunk">github.com redux-thunk</a></li>
+  <li><b>Redux-Logger</b>: Creates a log in the console every time an action is called. Docs: <a href="https://www.npmjs.com/package/redux-logger">npmjs.com/package/redux-logger</a></li>
+  <li><b>react-router-dom</b>: Adds routes to your React app. Docs: <a href="https://reacttraining.com/react-router/web/guides/philosophy">reacttraining.com/react-router/web/guides</a></li>
+  <li><b>Axios</b>: Facilitates making API calls using AJAX. Docs: <a href="https://www.npmjs.com/package/axios">npmjs.com/package/axios</a></li>
+  <li><b>Bootstrap</b>: Popular CSS framework which we will use for convenience.</li>
+</ul>
+
+<p>Run the server to make sure it's working:</p>
+<p class="dlr"><code>yarn start</code></p>
+<p>You should see the default Welcome to React app in your browser.</p>
+
+<p>Since we will be integrating our React front end with our API let's add the API's URL as a proxy in the client/package.json file. This will give us three benefits. Whenever we call the API in our React app code we only need to list the path, not the full URL. Second, if you want to change the API domain for any reason, you only need to do it in one place. Third, it helps eliminate the cross-origin issues discussed in the API tutorial.</p>
+<p>Make sure to put this in the package.json file in the client directory not the one in the project's root directory.</p>
+<pre>
+<span>// client/package.json</span>
+{
+  "name": "client",
+  "version": "0.1.0",
+  "private": true,
+  <b>"proxy": "http://localhost:3001",</b>
+  "dependencies": {
+    "axios": "^0.19.0",
+    ...
+}
+</pre>
+
+<hr class="space">
+<h4>Set up the File Structure</h4>
+<p>Use the below Unix commands to create directories and remove, move, and create files. Or you can do it in you text editor.</p>
+<pre>
+rm README.md
+rm -rf .git
+mkdir -p src/components/pages
+touch src/components/pages/About.js
+mkdir src/components/articles
+touch src/components/articles/ArticleList.js
+touch src/components/articles/ArticleInfo.js
+touch src/components/articles/ArticleAdd.js
+touch src/components/articles/ArticleEdit.js
+mkdir src/actions
+touch src/actions/index.js
+mkdir src/reducers
+touch src/reducers/index.js
+touch src/reducers/articlesReducer.js
+touch src/reducers/articleReducer.js
+</pre>
+<p>We removed some unnecessary files including the git repository that create-react-app generated for us. We won't be using git in this tutorial but if we were we would generate a git repository in the project root directory for our API and our React client combined. You can leave the .gitignore file though since git allows multiple gitignore files.</p>
+<p>We'll cover the added directories and files as we build the app but just as a high level overview, Redux uses actions and reducers. Our app is just big enough to warrant separate folders for each. And each has an index.js file which is automatically called by Redux when you reference the folder.</p>
+<p>Go to the src/App.css file and delete all the CSS there so it doesn't mess with our app's styling.</p>
+
+<hr class="space">
+<h4>Set up Redux</h4>
+<p>First we'll set up the main index.js file for our React with Redux app.</p>
+<pre>
+// <b>src/index.js</b>
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import { createStore, applyMiddleware } from 'redux';
+import thunk from 'redux-thunk';
+import logger from 'redux-logger'
+import { Provider } from 'react-redux';
+import 'bootstrap/dist/css/bootstrap.css';
+import './index.css';
+import App from './App';
+import rootReducer from './reducers';
+
+const store = createStore(rootReducer, applyMiddleware(thunk, logger)); <span> #1</span>
+
+ReactDOM.render(
+  &lt;Provider store={store}> <span>                                              #2</span>
+    &lt;App />
+  &lt;/Provider>, 
+  document.getElementById('root')
+);
+</pre>
+<ol>
+  <li>In addition to the standard React setup, we are setting up our Redux store with the createStore method. It takes our root reducer as the first argument, imported from the src/reducers/index.js file. And we will be applying the Thunk middleware package for our asynchronous API calls, and Logger for logging our actions in the Console to help with development.</li>
+  <li>The Redux-React package enables Redux to interact with React. Wrapping our main App element in Redux-React's Provider component with a store attribute makes the Redux store available to all our React components.</li>
+</ol>
+
+<hr>
+<p>The first argument in createStore() is the reducer. Our app will have two reducer functions, one for an array of articles, and one for a specific article. When you have more than one reducer you need to combine them into a single reducer object using Redux's combineReducers method. We can set that up now in the reducers index file even though we haven't defined the reducers yet.</p>
+<pre>
+<span>// src/reducers/index.js</span>
+
+import { combineReducers } from 'redux';
+import articles from './articlesReducer';
+import article from './articleReducer';
+
+export default combineReducers({
+  articles: articles,
+  article: article,
+});
+</pre>
+
+<hr class="space">
+<h4>Set up React Router</h4>
+<p>React Router is the most popular Routing package for React. The docs are at <a href="https://reacttraining.com/react-router/core/guides/philosophy">reacttraining.com/react-router/core/guides</a>. It can work independently of Redux.</p>
+<p>Our navigation will be contained in the App component. We will set up a nav bar with two menu items, home and articles, and add all our routes up front.</p>
+<pre>
+<span>// src/App.js</span>
+
+import React from 'react';
+import {BrowserRouter as Router, Route, NavLink, Switch} from 'react-router-dom';
+import './App.css';
+import About from './components/pages/About';
+import ArticleList from './components/articles/ArticleList';
+import ArticleInfo from './components/articles/ArticleInfo';
+import ArticleAdd from './components/articles/ArticleAdd';
+import ArticleEdit from './components/articles/ArticleEdit';
+
+function App() {
+  return (
+    &lt;div className="App">     
+      &lt;Router>
+        &lt;Navigation />
+        &lt;div className="container">
+          &lt;Main />
+        &lt;/div>
+      &lt;/Router>
+    &lt;/div>
+  );
+}
+
+function Navigation() {
+  return(
+    &lt;nav className="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+      &lt;div className="container">
+        &lt;ul className="navbar-nav mr-auto">
+          &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/">Articles&lt;/NavLink>&lt;/li>
+          &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/about">About&lt;/NavLink>&lt;/li>
+        &lt;/ul>
+      &lt;/div>
+    &lt;/nav>
+  );
+}
+
+function Main() {
+  return(
+    &lt;Switch>
+      &lt;Route exact path="/" component={ArticleList} />
+      &lt;Route exact path="/articles/new" component={ArticleAdd} />
+      &lt;Route exact path="/articles/:<%= @mongoid %>id" component={ArticleInfo} />
+      &lt;Route exact path="/articles/:<%= @mongoid %>id/edit" component={ArticleEdit} />
+      &lt;Route exact path="/about" component={About} />      
+    &lt;/Switch>
+  );
+}
+
+export default App;
+</pre>
+
+<p>Our home page here is the ArticleList component.</p>
+<p>To test if our initial Redux app and router are working let's add our About component. This will simply display "About Page". We already created an empty About.js file. Populate it with the below:</p>
+<pre>
+<span>// src/components/pages/About.jsx</span>
+
+import React from 'react'; <span>      1</span>
+
+function About() { <span>              2</span>
+  return (
+    &lt;div className="jumbotron">
+      &lt;h1>About Page&lt;/h1>
+    &lt;/div>
+  );
+}
+
+export default About; <span>           3</span>
+</pre>
+
+<p>And let's create a placeholder for the ArticleList page:</p>
+<pre>
+<span>// src/components/articles/ArticleList.js</span>
+
+import React from 'react'; 
+export default function ArticleList() { return &lt;h1>Articles&lt;/h1> }
+</pre>
+
+<p>Restart the server: CTRL+C <code>yarn start</code></p>
+
+<p>Now when you go to localhost:3000 you should you should be on the articles page with a navbar with routes for Articles and About. Clicking on About will take you to the About page displaying a jumbotron that says "About Page". And clicking on Articles should take you back to the ArticleList page. Our routes are working! Now it's time to create our first API call.</p>
+
+<hr class="space">
+<h4>Get Articles - Connect the ArticleList Component</h4>
+<p>Let's make our first API call and update our User Interface with our first Action. From an HTTP request perspective, this is a GET request. From a database CRUD perspective this is a Read command.</p>
+<p>Let's initially populate our app with a list of articles pulled from the database and served by the API. Since we set up a Redux store object to be our single source of truth, and since the ArticleList page is our root route, let's add two lines to our initial src/index.js file:</p>
+<pre>
+<span>// src/index.js</span>
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import { createStore, applyMiddleware } from 'redux';
+import thunk from 'redux-thunk';
+import logger from 'redux-logger'
+import { Provider } from 'react-redux';
+import 'bootstrap/dist/css/bootstrap.css';
+import './index.css';
+import App from './App';
+import rootReducer from './reducers';
+<b>import { setArticles } from './actions';</b> <span>                                #1</span>
+
+const store = createStore(rootReducer, applyMiddleware(thunk, logger));
+
+<b>store.dispatch(setArticles());</b> <span>                                          #2</span>
+
+ReactDOM.render(
+  &lt;Provider store={store}>
+    &lt;App />
+  &lt;/Provider>, 
+  document.getElementById('root')
+);
+</pre>
+<p>
+<ol>
+  <li>Import the setArticles method from the actions folder. It doesn't exist yet but we'll define it next.</li>
+  <li>We are applying the dispatch method directly to the store object. It is calling the setArticles method which will do an API call then use an action to get the data in the store. This is the only time we will apply the dispatch method directly on the store. The rest of the actions will be dispatched from our components.</li>
+</ol>
+
+<p>The setArticles method includes our first Action. Since we will have several actions we will define them all in the actions folder.</p>
+<pre>
+<span>// src/actions/index.js</span>
+
+import { get } from 'axios'; <span>                                    #1</span>
+
+export const SET_ARTICLES = 'SET_ARTICLES'; <span>                     #2</span>
+
+export function setArticles() { <span>                                 #3</span>
+  return function(dispatch) {
+    return get("/api/articles") <span>                                 #4</span>
+      .then(function(response) {
+        dispatch({type: SET_ARTICLES, articles: response.data}) <span> #5</span>
+      })
+      .catch(function(error) { console.log('error', error); });
+  };
+};
+</pre>
+
+<p>Let's break this down.</p>
+<ol>
+  <li>Import the Axios module to facilitate making AJAX calls to our API.</li>
+  <li>Redux recommends using string constants for our Action types rather than string literals, so we'll declare it here and use it below and later in our reducer function.</li>
+  <li>SetArticles() will make our API call and use the dispatch method to send an action to the reducer.</li>
+  <li>Make an HTTP GET request to our API endpoint using AJAX via the Axios module. We don't need to use the full URL, just the path. We added the domain portion as a proxy in the client/package.json file.</li>
+  <li>Using ES6 Promises if we get a successful response we will call the dispatch method and send an Action. In this case the action type is SET_ARTICLES, and we are sending the API response data with the action as a payload called "articles." Then the reducer will add it to the store.</li>
+</ol>
+
+<p>Now that we've sent our retrieved articles to the reducer with our action, let's define the reducer.</p>
+<pre>
+<span>// src/reducers/articlesReducer.js</span>
+
+import { SET_ARTICLES } from '../actions'; <span>                              #1</span>
+
+const initialState = { articles: [] }
+export default function articlesReducer(state = initialState, action) {  <span>#2</span>
+  switch (action.type) {
+    case SET_ARTICLES: <span>                                                  #3</span>
+      return action.articles;
+    default: <span>                                                            #4</span>
+      return state;
+  }
+}
+</pre>
+<ol>
+<li>Import the SET_ARTICLES string constant we declared in the actions file.</li>
+<li>Declare our reducer function with two arguments, state and action. Set the initial state to an empty articles array.</li>
+<li>Use a switch statement to match the action type. If the action type is SET_ARTICLES it returns the articles data to update the store with.</li>
+<li>You need a default case. If there is no match, the reducer will just return the current state.</li>
+</ol>
+
+<p>Now our store contains an an articles array with the articles from the API. Time to use that to change the User Interface. Fill in the ArticleList component with this:</p>
+<pre>
+<span>// src/components/articles/ArticleList.js</span>
+
+import React from 'react';
+import { useSelector } from 'react-redux'; <span>                                #1</span>     
+import { Link } from 'react-router-dom';
+
+function ArticleList(){
+  const articles = useSelector(function(state) { return state.articles }); <span>#2</span>
+  return ( <span>                                                                #3</span>
+    &lt;div>
+      &lt;h2>
+        Articles
+        &lt;Link to="/articles/new" className="btn btn-primary float-right">Create Article&lt;/Link> 
+      &lt;/h2>
+      {articles.length && articles.map(function(article) { <span>                #4</span>
+        return (
+          &lt;div key={ article.<%= @mongoid %>id }> <span>                                       #5</span>
+            &lt;hr/>               
+            &lt;h4>&lt;Link to={`/articles/${article.<%= @mongoid %>id}`}>{article.title}&lt;/Link>&lt;/h4> <span>#6</span>
+            &lt;small>id: {article.<%= @mongoid %>id}&lt;/small>      
+          &lt;/div>
+        );
+      })}
+    &lt;/div>
+  )
+}
+
+export default ArticleList;
+</pre>
+
+<ol>
+  <li>Import the useSelector hook from the react-redux package. React-redux has two main hooks that we will be using in our app... useSelector and useDispatch. You can read about them at <a href="https://react-redux.js.org/next/api/hooks">react-redux.js.org/next/api/hooks</a>. If you are familiar with Redux without hooks, useSelector replaces the the mapStateToProps method.</li>
+<li>Create the ArticlesList component as a function. React and React-Redux hooks use functional components instead of class components.</li>
+  <li>Employ the useSelector hook to get the articles array from the Redux store and add it to our component's state. Assign it to a variable we'll call "articles". The articles state is an object that contains an array of the articles we got from the API. We set up our app to do the API query and add the results to the redux store when we first open the app. 
+  </li>
+  <li>Our component returns the list of articles in JSX which React converts to HTML.</li>
+  <li>We assigned the articles object we pulled from the Redux store to the variable articles and put it in our component's state. So now we can use the JavaScript map method to iterate over the articles array to present is as we specify in the map function. However, React will run the return statement twice. Once before we get our articles from the store and once after. This will cause the map method to throw an error the first time since there is no articles array. To avoid that we make it a conditional, checking that there are articles first with <code>articles.length</code>. If that evaluates to false then it won't go on to the articles.map method.</li>
+  <li>React requires a unique key to iterate over an array, so we'll use the article id.</li>
+<li>Use React-Router's Link component to add a hyperlink to each article title that will take the user to its ArticleInfo component (to be defined later).</li>
+</ol>
+
+<p>Let's see if it works. If you have a local MongoDB database make sure that is running, or start it in a separate terminal window (any directory will work):
+<p class="dlr"><code>mongod</code></p> 
+<p class='my-1'>To start the API server in a separate terminal window go to the project's root directory:</p>
+<p class="dlr"><code>nodemon</code></p>
+<p>You should see the articles you created in the API tutorial. If it isn't working first try restarting the client server: CTRL+C <code>yarn start</code>.</p>
+
+<hr class="space">
+<h4>Post Articles - Connect the ArticleAdd Component</h4>
+<p>On to the ArticleAdd component. This component will display a form to submit a new article. We will send an HTTP POST request to the appropriate API endpoint, which should Create a new record in the database. Then we'll update the Redux store to add the new article to the articles array and redirect our route back to the ArticleList page.</p>
+<p>This time everything begins in the component, which is a form. Populate it with the below:</p>
+<pre>
+<span>// src/components/articles/ArticleAdd.js</span>
+
+import React, { useState } from 'react'; <span>                      #1</span>
+import { useDispatch } from 'react-redux'; <span>                    #2</span>
+import { post } from 'axios';
+import { addArticle } from '../../actions'; <span>                   #3</span>
+
+function ArticleAdd(props) { <span>                                  #4</span>
+  const initialState = { title: '', content: '' }
+  const [article, setFields] = useState(initialState) <span>         #5</span>
+  const dispatch = useDispatch(); <span>                             #6</span>
+
+  function handleChange(event) { <span>                              #7</span>
+    setFields({...article, [event.target.name]: event.target.value});
+  }
+
+  function handleSubmit(event) { <span>                              #8</span>
+    event.preventDefault();
+    if(!article.title || !article.content ) return
+    post('/api/articles', {title: article.title, content: article.content})
+      .then(function(response) {
+        dispatch(addArticle(response.data));
+      })
+      .then(function() {
+        props.history.push("/")
+      })
+      .catch(function(error) { console.log(error); });    
+  };
+
+  function handleCancel() {
+    props.history.push("/");
+  }
+
+  return (
+    &lt;div>
+      &lt;h4>Add Article&lt;/h4>
+      &lt;form onSubmit={ handleSubmit }>
+        &lt;div className="form-group">
+          &lt;input type="text" name="title" required value={article.title} onChange={handleChange} className="form-control" placeholder="Title" />
+        &lt;/div>
+        &lt;div className="form-group">
+          &lt;textarea name="content" rows="5" required value={article.content} onChange={handleChange} className="form-control" placeholder="Content" />
+        &lt;/div>
+        &lt;div className="btn-group">
+          &lt;input type="submit" value="Submit" className="btn btn-primary" />
+          &lt;button type="button" onClick={handleCancel} className="btn btn-secondary">Cancel&lt;/button>
+        &lt;/div>
+      &lt;/form>
+    &lt;/div>
+  );
+}
+
+export default ArticleAdd;
+</pre>
+<ol>
+  <li>We haven't used the React hooks yet, of which there are two main ones... useState and useEffect. Import useState which will allow us to add state to a functional component.</li>
+  <li>React-redux also has two main hooks. We used useSelector hook in the ArticleList component for accessing existing state. Now we'll use the useDispatch hook to modify the Redux store.</li>
+  <li>Import the addArticle function from the Actions file.</li>
+  <li>Create our component as a function.</li>
+  <li><b><a href="https://reactjs.org/docs/hooks-state.html">useState:</a></b> UseState is a two element array that contains the current state as the first element and a function to update it as the second. Here we're assigning the (const) variable "article" to the current state value, and "setFields" to the update function.</li>
+  <li>React-Redux's useDispatch hook returns a reference to the dispatch function from the Redux store. We use it to dispatch our addArticle action below. This replaces the mapDispatchToProps method you would use in a class component without hooks.</li>
+  <li>Every time a user types a character in a form input field the onChange property calls the handleChange handler function passing the event object as an implicit argument. The event object includes the target (i.e., the form field element) which has attributes for field name and value. <br>
+  The handleChange function in turn calls setFields which updates the article state with the new value. You need to include the ...article spread operator so that the new character is added to the existing article value, otherwise it will just overwrite it.</li>
+  <li>When the user presses the submit button it calls the handleSubmit function. This is where our API post request is sent with the article object sent as the payload. If it successfully posts it will send back the new article object. Then we dispatch the addArticle action passing in the new article object.</li>
+</ol>
+
+<p>Time to define our addArticle function. We'll add it to the actions folder.</p>
+<pre>
+<span>// src/actions/index.js</span>
+...
+<b>export const ADD_ARTICLE = 'ADD_ARTICLE';</b>
+...
+export function addArticle(article) {
+  return {
+    type: ADD_ARTICLE,
+    article: article,
+  };
+};
+</pre>
+<p>This is different than the getArticles function because we already made our API request. The only thing we are doing in this action is passing on the article object to the reducer.</p>
+
+<p>Last step: add the new article to our the articles object in the Redux store.</p>
+<pre>
+// <b>src/reducers/articlesReducer.js</b>
+
+import { SET_ARTICLES, <b>ADD_ARTICLE</b> } from '../actions'; <span>             #1</span>
+
+const initialState = { articles: [] }
+export default function articlesReducer(state = initialState, action) {
+  switch (action.type) {
+    case SET_ARTICLES:
+      return action.articles;
+    <b>case ADD_ARTICLE:</b> <span>                                                   #2</span>
+      <b>return [action.article, ...state];</b>
+    default:
+      return state;
+  }
+}
+</pre>
+<ol>
+  <li>Import ADD_ARTICLE from the actions folder.</li>
+  <li>Add the action type to the switch statement. It adds the new article to the beginning of the existing articles array from the store's current state.</li>
+</ol>
+<p>Now try it out. In the browser you should be able to click on the Add Article link, fill out and submit the form, and be redirected to the articles page with the new article on top. Second action complete!</p>
+
+
+
+<hr class="space">
+<h4>Get Article and Delete Article - Connect the ArticleInfo Component</h4>
+<p>Our articles page lists all the articles from the API, and each article title has a link to an ArticleInfo page. Clicking it will result in another HTTP GET request to the API URL appended with the article id (e.g., localhost:3001/articles/3). We will also have a button to send an HTTP DELETE request. From a database CRUD prespective we will be using Read and Delete commands.</p>
+<p>Start with the component:</p>
+<pre>
+<span>// src/components/articles/ArticleInfo.js</span>
+
+import React, { useEffect } from 'react'; <span>                    #1</span>
+import { useSelector, useDispatch } from 'react-redux'; <span>      #2</span>
+import axios from 'axios'; <span>                                   #3</span>
+import { Link } from 'react-router-dom';
+import { setArticle, removeArticle } from '../../actions'; <span>   #4</span>
+
+function ArticleInfo(props) { <span>                                #5</span>
+  const article = useSelector((state) => state.article) <span>      #6</span>
+  const dispatch = useDispatch(); <span>                            #7</span>
+
+  useEffect(function() { <span>                                     #8</span>
+    axios.get(`/api/articles/${props.match.params.<%= @mongoid %>id}`)
+      .then(function(response) {
+        dispatch(setArticle(response.data)); <span>                 #9</span>
+      })
+      .catch(function(error) { 
+        console.log('error', error);
+      });
+  }, [dispatch, props]); <span>                                     #10</span>
+
+  function handleDelete() { <span>                                  #11</span>
+    axios.delete(`/api/articles/${article.<%= @mongoid %>id}`)
+      .then(function() {
+        dispatch(removeArticle(article.<%= @mongoid %>id));
+        props.history.push("/")
+      })
+      .catch(function(error) { console.log('error', error) });
+  }
+
+  return (
+    &lt;div>
+      &lt;h2>{article.title}&lt;/h2>
+      &lt;small>id: {article.<%= @mongoid %>id}&lt;/small>
+      &lt;p>{article.content}&lt;/p>
+      &lt;div className="btn-group">
+        &lt;Link to={{ pathname: `/articles/${article.<%= @mongoid %>id}/edit` }} className='btn btn-info'>Edit&lt;/Link>
+        &lt;button className="btn btn-danger" type="button" onClick={handleDelete}>Delete&lt;/button>
+        &lt;Link to="/" className="btn btn-secondary">Close&lt;/Link>
+      &lt;/div>
+      &lt;hr/>
+    &lt;/div>
+  )
+}
+
+export default ArticleInfo;
+</pre>
+<ol>
+  <li>React has two main hooks. We already saw the useState hook in the ArticleAdd component which sets the component's state. This time we'll import the other main hook, useEffect.</li>
+  <li>Likewise, react-redux has two main hooks. We used one of each in ArticleList and ArticleAdd. This time we'll import and use both of them.</li>
+  <li>We used the Axios libary in the last to actions to make get and post requests to the API. This time, instead of importing the specific actions we are going to use (get and delete), we are importing the whole Axios library. That's because "delete" is a JavaScript reserved word. Since we're import the whole Axios library, we call the specific methods with axios.get and axios.delete.</li>
+  <li>Import the Redux actions we will be using.</li>
+  <li>Declare our component as a function. Pass in props as a parameter because we will be accessing the article id in the component from the params prop.</li>
+  <li>Call the react-redux useSelector hook to get the article object from the Redux store and assign it to the component's state. This replaces the mapStateToProps method you would use in a class component without hooks.</li>
+  <li>React-redux's useDispatch hook returns a reference to the dispatch function from the Redux store. We use it to dispatch our setArticle and removeArticle actions below. UseDispatch replaces the mapDispatchToProps method you would use in a class component without hooks.</li>
+  <li><b><a href="https://reactjs.org/docs/hooks-effect.html">useEffect:</a></b> The React useEffect hook essentially replaces the lifecycle methods (componentDidMount, componentDidUpdate, componentWillUnmount). Use it when we need to rerender our component. Making an API call in the component is one such cases since we will need to change the state in our component after we get back the response. Code inside the useEffect method runs after the initial render of the component.</li>
+  <li>Dispatch the setArticle action, passing the article object as the argument.</li>
+  <li>The useEffect hook takes a second argument called the dependency array that instructs React to rerun the effect only when the listed elements in the array change. React will post a warning in the console if you leave something out.</li>
+  <li>In our return statement holding our JSX=>HTML there is a delete button with the onClick property calling the handleDelete function. HandleDelete sends the delete request to the API then dispatches the removeArticle action passing in the article id.</li>
+</ol>
+<p>So our component dispatches two different actions, setArticle and removeArticle. Let's create those actions:</p>
+<pre>
+// <b>src/actions/index.js</b>
+...
+export const SET_ARTICLES = 'SET_ARTICLES';
+export const ADD_ARTICLE = 'ADD_ARTICLE';
+<b>export const SET_ARTICLE = 'SET_ARTICLE';
+export const REMOVE_ARTICLE = 'REMOVE_ARTICLE';</b>
+...
+export function setArticle(article) {
+  return {
+    type: SET_ARTICLE,
+    article: article,
+  };
+};
+
+export function removeArticle(<%= @mongoid %>id) {
+  return {
+    type: REMOVE_ARTICLE,
+    <%= @mongoid %>id: <%= @mongoid %>id,
+  };
+};
+</pre>
+
+<p>Populate the articleReducer file. This is not the same file or reducer as article<b><u>s</u></b>Reducer. ArticleReducer manages state and actions for a single article object, while the articlesReducer manages state and actions for an array of article objects.</p>
+<pre>
+<span>// src/reducers/articleReducer.js</span>
+
+import { SET_ARTICLE } from '../actions';
+
+export default function articleReducer(state = {}, action) { <span>#1</span>
+  switch (action.type) {
+    case SET_ARTICLE: <span>                                       #2</span>
+      return action.article;
+    default:
+      return state;
+  }
+};
+</pre>
+<ol>
+  <li>Set the initial state to an empty object.</li>
+  <li>If the action type is SET_ARTICLE then the reducer returns the article data to be added to the store.</li>
+</ol>
+<p>With the removeArticle action we want to remove the deleted article from the articles object in the Redux store. Another alternative would be to refresh articles object with another API query but that wouldn't be very efficient would it? No it wouldn't.</p>
+<pre>
+<b>// src/reducers/articlesReducer.js</b>
+
+import { RECEIVE_ARTICLES, ADD_ARTICLE, <b>REMOVE_ARTICLE</b> } from '../actions';
+
+const initialState = { articles: [] }
+export default function articlesReducer(state = initialState, action) {
+  switch (action.type) {
+    case SET_ARTICLES:
+      return action.articles;
+    case ADD_ARTICLE:
+      return [action.article, ...state];
+    <b>case REMOVE_ARTICLE:
+      return state.filter(article => article.<%= @mongoid %>id !== action.<%= @mongoid %>id);</b>
+    default:
+      return state;
+  }
+}
+</pre>
+<p>Now test it out. Create an article, click on its info page, then delete it. That's two more actions we've successfully programmed. On to the final piece of CRUD. Update.</p>
+
+<hr class="space">
+<h4>Update Article - Connect the ArticleEdit Component</h4>
+<p>Now let's add an edit form that makes an HTTP PATCH request to the server and Updates an existing article in the database.</p>
+
+<pre>
+<span>// src/components/articles/ArticleEdit.js</span>
+
+import React, { useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { patch } from 'axios';
+import { setArticle, replaceArticle } from '../../actions';
+
+function ArticleEdit(props) {
+  const initialState = useSelector((state) => state.article)
+  let [article, changeArticle] = useState(initialState)
+  const dispatch = useDispatch();
+
+  function handleChange(event) {
+    changeArticle({...article, [event.target.name]: event.target.value});
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    if(!article.title || !article.content ) return
+    patch(`/api/articles/${article._id}`, {title: article.title, content: article.content})
+      .then(function(response) {
+        dispatch(setArticle(article));
+        dispatch(replaceArticle(article));
+      })
+      .then(function() {
+        props.history.push(`/articles/${article._id}`)
+      })
+      .catch(function(error) { console.log(error); });
+  };
+
+  function handleCancel() {
+    props.history.push(`/articles/${article._id}`);
+  }
+
+  return (
+    &lt;div>
+      &lt;h1>Edit {article.title}&lt;/h1>
+      &lt;form onSubmit={handleSubmit}>
+        &lt;div className="form-group">
+          &lt;label>Title&lt;/label>
+          &lt;input type="text" name="title" defaultValue={article.title} onChange={handleChange} className="form-control" />
+        &lt;/div>
+        &lt;div className="form-group">
+          &lt;label>Content&lt;/label>
+          &lt;textarea name="content" rows="5" defaultValue={article.content} onChange={handleChange} className="form-control" />
+        &lt;/div>
+        &lt;div className="btn-group">
+          &lt;button type="submit" className="btn btn-primary">Update&lt;/button>
+          &lt;button type="button" onClick={handleCancel} className="btn btn-secondary">Cancel&lt;/button>
+        &lt;/div>
+      &lt;/form>
+    &lt;/div>
+  );
+}
+
+export default ArticleEdit;
+</pre>
+<p class="mb-1">We won't go through the code this time since most of the concepts were covered in ArticleInfo and ArticleAdd.</p>
+<p>Note we are getting the article state from the Redux store, not doing another API query. In a production app you would add some code to do an API call if the user refreshes the edit page which will clear out the store, but we'll keep it simple and not do that.</p>
+<p>The only thing we need to do in our action and dispatch is to change the articles object by replacing the old version of the article with the new version.</p>
+
+<p>Now let's finish the Actions page. This is the final code.</p>
+<pre>
+<span>// src/actions/index.js</span>
+
+import { get } from 'axios';
+
+export const SET_ARTICLES = 'SET_ARTICLES';
+export const ADD_ARTICLE = 'ADD_ARTICLE';
+export const SET_ARTICLE = 'SET_ARTICLE';
+export const REMOVE_ARTICLE = 'REMOVE_ARTICLE';
+<b>export const REPLACE_ARTICLE = 'REPLACE_ARTICLE';</b>
+
+export function setArticles() {
+  return function(dispatch) {
+    return get('/api/articles')
+      .then(function(response) {
+        dispatch({type: SET_ARTICLES, articles: response.data})
+      })
+      .catch(function(error) { console.log('error', error); });
+  };
+};
+
+export function addArticle(article) {
+  return {
+    type: ADD_ARTICLE,
+    article: article,
+  };
+};
+
+export function setArticle(article) {
+  return {
+    type: SET_ARTICLE,
+    article: article,
+  };
+};
+
+export function removeArticle(_id) {
+  return {
+    type: REMOVE_ARTICLE,
+    _id: _id,
+  };
+};
+
+<b>export function replaceArticle(article) {
+  return {
+    type: REPLACE_ARTICLE,
+    article: article,
+  };
+}</b>
+</pre>
+
+<p>And the final code for the articlesReducer.</p>
+<pre>
+<span>// src/reducers/articlesReducer.js</span>
+
+import { SET_ARTICLES, ADD_ARTICLE, REMOVE_ARTICLE, <b>REPLACE_ARTICLE</b> } from '../actions';
+
+const initialState = { articles: [] }
+export default function articlesReducer(state = initialState, action) {
+  switch (action.type) {
+    case SET_ARTICLES:
+      return action.articles;
+    case ADD_ARTICLE:
+      return [action.article, ...state];
+    case REMOVE_ARTICLE:
+      return state.filter(article => article._id !== action._id);
+    <b>case REPLACE_ARTICLE:
+      return state.map(function(article) {
+        if (article._id === action.article._id) {
+          return {
+            ...article,
+            title: action.article.title,
+            content: action.article.content,
+          }
+        } else return article;
+      })</b>
+    default:
+      return state;
+  }
+}
+</pre>
+
+<p>Make sure all the files are saved, then try it out in the browser. Add an article, click to go to its info page, update it, then delete it. That's the last of our Components. One more optional step then we are done.</p>
+
+<!-- npm run dev -->
+<div id="npm-run-dev"></div>
+<script>
+const partial = document.getElementById('npm-run-dev');
+fetch('_npm_run_dev.html')
+  .then((response) => response.text())
+  .then((body) => partial.innerHTML = body);
+</script>
+
+<hr>
+<p>Congratulations you now have a fully functioning React with Redux app using hooks that can perform all four CRUD operations on the database through the API. That's a lot. To put it in production one option is to use Heroku. To find out how to do that go to the optional last part of this MERN tutorial series <a href="mern_heroku">Deploy a MERN app to Heroku</a></p>
+
+</div>
+</div>
+</body>
+</html>

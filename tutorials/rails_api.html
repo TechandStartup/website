@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Ruby API Tutorial</title>
+  <meta name="description" content="Tutorial on how to build an Ruby on Rails API. Shows various techniques including using the jBuilder gem, active-model-serializers, the rack-cors gem, building an API only application, and adding an api namespace."> 
+  <meta name="keywords" content="Ruby on Rails API, Rails API, Rails API tutorial">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Ruby on Rails API Tutorial</h1>
+  <p>Create a Back End API with Ruby on Rails</p>
+  <p>By Steve Carey - 7/30/2018</p>
+  This Tutorial covers:
+  <ul>
+    <li><a href="#app-with-api">Adding an API to a traditional Rails app using Jbuilder</a></li>
+    <li><a href="#curl">Test your API with Curl or Postman</a></li>
+    <li><a href="#active-model-serializers">Use Active-Model-Serializers gem instead of Jbuilder</a></li>
+    <li><a href="#api-namespace">Adding an API namespace</a></li>
+    <li><a href="#api-only">Building an API only App</a></li>    
+  </ul>
+  <p>Finished code: <a href="https://github.com/steve981cr/articles-api">Github</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<h2>Introduction</h2>
+
+<!-- react intro -->
+<p>This is part of a series of tutorials on APIs and the React library. See the full list at <a href="../tutorials">Tutorials</a>. Throughout this series we build a Create-Read-Update-Delete (CRUD) application with a React front end and a Ruby on Rails back end. Each section is self-contained.</p>
+
+<p>This is an introductory tutorial on how to build an Application Programming Interface (API) with Ruby on Rails. It assumes you are already familiar with Ruby on Rails. Essentially we are building an application based on the Ruby on Rails Model-View-Controller architecture but without the view. Instead we will provide URL endpoints that interact with a separate front-end application. In this tutorial series our front end is a React Web interface, but it could be a different library or framework like AngularJS or Vue.js or a mobile app.</p>
+
+<p>Quick note on terminology. In this tutorial the terms back end, server side, and API all refer to the Rails API and can be used interchangably. The terms front end, client, user interface, and React views in the context of this tutorial all refer to the React components and can also be used mostly interchangably. Throughout this tutorial we will preface Terminal commands with a dollar sign (but don't enter the dollar sign). Code you enter in files will start with "#" and the file name at the top</p>
+
+<h4>What type of API do you need?</h4>
+<p>Determining what type of API you need depends on what type of front end client or clients your app will interact with. In the past, APIs were intended for external web sites to access data from your site, usually read only. Then smartphones came on the scene and suddenly millions of mobile apps required access to data through APIs with both read and write capabilities. Now with JavaScript libraries and Frameworks like React, Angular, Vue and others acting as separate front-end applications, frameworks like Rails need to provide APIs just for their own front end. And even then you have the option of using the front-end application exclusively for all your views as with a Single-Page Application (SPA). Or you can use something like React for some of your front-end components and Rails views for the others. Today APIs are used for all these types of clients and more.</p>
+<p>Some of the ways you can set up an API for these needs include:</p>
+<ul>
+  <li>For a traditional web application that also provides data to third party web sites or to a mobile app you can add JSON serving API endpoints to your app.</li>
+  <li>For a Single-Page Application you can generate a Rails API-only application for the server side and a separate React client application.</li>
+  <li>For a Traditional Rails Web application that uses React for some, but not all, of its views you can generate a standard Rails application that includes an API, and integrate React components via the Webpacker gem.</li>
+</ul>
+
+<h4>The Webpacker Gem</h4>
+<p>Traditionally, if you wanted to use a front-end library like React with your Rails app you would create a completely separate front-end application. This is fine for a SPA, but if you want to use React for only some of your views how would you do it? Rails 5.1 and up ships with a gem called webpacker that allows you to integrate front-end libraries like React, Angular, and Vue directly into your Rails app. Actually, the Webpacker gem is a middleware between Rails and the popular Webpack JavaScript pre-processor and bundler. We will cover Webpacker in <a href="rails_webpacker_react">Integrate React in Rails with Webpacker</a>.</p>
+
+<h4>JSON</h4>
+<p>The must common format for transmitting data to and from APIs is JavaScript Object Notation (JSON). JSON is not actually JavaScript. It is just a text string that is in the format of JavaScript objects, with attribute-value pairs separated by colons and surrounded by curly braces. Multiple objects are grouped in square brackets just like JavaScript arrays. JavaScript has built-in methods for converting JSON stings into JavaScript objects and JavaScript objects into JSON strings.</p>
+
+<h4>Endpoints and the HTTP Request-Response cycle</h4>
+<p>Your Rails API needs to provide endpoints to interact with the client. The endpoints are the URLs that the client calls with an HTTP request. Besides the URL, the request includes other information such as the HTTP method (GET, POST, PUT, PATCH, or DELETE). And for POST, PUT and PATCH requests it will include your data in the body, and the content type to indicate what format the data is in, in our case JSON. Each URL endpoint will have a corresponding controller action. That's where you program the action to take, often interacting with the database to get or set data. Your server then sends back a response to the client. If it was a GET request, the response would be the requested data in a JSON string. Your server also sends a status code back such as 200 for success, 404 for page not found, or 500 for internal server error to name a few.</p>
+
+<hr class="space">
+<h2 id="app-with-api">Build a Traditional Web Application that includes an API</h2>
+<p>Okay, let's build our Ruby on Rails API. Our application will include a database that holds articles that users can read, write, edit or delete. Rails ships with JSON API capability right out of the box. When you generate a scaffold it creates a controller with both html and JSON format. The JSON format can be used for an API. Let's use it.</p>
+
+<h4>Create a new Rails app</h4>
+<li class="dlr"><code>mkdir rails-api-with-react; cd rails-api-with-react</code> - Make your application folder and change directories into it.</li> 
+<li>If you are using RVM for Ruby and Gems version control you can set your gemset at this point.</li>
+<p class="dlr"><code>rails new .</code> - Generate the app.</p>
+
+<h4>Generate an Articles scaffold</h4>
+<li class="dlr"><code>rails generate scaffold Article title:string content:text --no-assets --no-helper</code></li>
+<li class="dlr"><code>rails db:migrate</code></li>
+<p>This will generate an articles database table, an Article model, a set of RESTful routes, an articles_controller, and HTML and JBuilder views. The latter is the serializer converting your data to JSON strings.</p>
+
+<h4>Controller</h4>
+<p>The controller that the scaffold generated responds to both HTML and JSON formats. As a convenience, it lists the URL paths as comments above each action. The index, show, create, update, and destroy actions all allow JSON format requests. Rails treats the request as an HTML request by default unless the URL has .json appended to it.</p>
+<p>Below is the scaffold generated controller. We'll use it as is except we need to add the line <code>protect_from_forgery unless: -> { request.format.json? }</code> at the top. Alternatively, we could put this line in the application_controller.rb file so it applies to all controllers. We'll discuss this in the CORS and Security section shortly.</p>
+
+<pre>
+# app/controller/articles_controller.rb
+class ArticlesController < ApplicationController
+  protect_from_forgery unless: -> { request.format.json? }
+
+  # GET /articles
+  # GET /articles.json
+  def index
+    @articles = Article.all
+  end
+
+  # GET /articles/1
+  # GET /articles/1.json
+  def show
+    @article = Article.find(params[:id])
+  end
+
+  # GET /articles/new
+  def new
+    @article = Article.new
+  end
+
+  # GET /articles/1/edit
+  def edit
+    @article = Article.find(params[:id])
+  end
+
+  # POST /articles
+  # POST /articles.json
+  def create
+    @article = Article.new(article_params)
+    respond_to do |format|
+      if @article.save
+        format.html { redirect_to @article, notice: 'Article was successfully created.' }
+        format.json { render :show, status: :created, location: @article }
+      else
+        format.html { render :new }
+        format.json { render json: @article.errors, status: :unprocessable_entity }
+      end
+    end
+  end
+
+  # PATCH/PUT /articles/1
+  # PATCH/PUT /articles/1.json
+  def update
+    @article = Article.find(params[:id])
+    respond_to do |format|
+      if @article.update(article_params)
+        format.html { redirect_to @article, notice: 'Article was successfully updated.' }
+        format.json { render :show, status: :ok, location: @article }
+      else
+        format.html { render :edit }
+        format.json { render json: @article.errors, status: :unprocessable_entity }
+      end
+    end
+  end
+
+  # DELETE /articles/1
+  # DELETE /articles/1.json
+  def destroy
+    @article = Article.find(params[:id])
+    @article.destroy
+    respond_to do |format|
+      format.html { redirect_to articles_url, notice: 'Article was successfully destroyed.' }
+      format.json { head :no_content }
+    end
+  end
+
+  private
+    def article_params
+      params.require(:article).permit(:title, :content)
+    end
+end
+</pre>
+<p>The index, show, create, update, and delete actions are all API end points that respond to JSON requests.</p>
+<p>The index and show actions respond to GET requests by pulling article records from the articles database table and rendering them. In Rails the render for GET requests is implied but you could add <code>render :index</code> and <code>render :show</code> to the index and show actions if you wanted to be explicit. For JSON requests, when using the JBuilder gem, Rails will render JSON views through the JBuilder view files. Below are the ones auto generated with the scaffold refactored to not use a partial. You can filter which attributes you want to send back and indicate the format to use. Rails then converts the data to a JSON string and transmits it back to the requester with the response.</p>
+<pre>
+# app/views/articles/index.json.jbuilder
+json.array! @articles do |article|
+  json.extract! article, :id, :title, :content, :created_at, :updated_at
+  json.url article_url(article, format: :json)
+end
+</pre>
+<pre>
+# app/views/articles/show.json.jbuilder
+json.extract! @article, :id, :title, :content, :created_at, :updated_at
+json.url article_url(@article, format: :json)
+</pre>
+<p>A POST request is handled by the create action. Rails converts the request body from a JSON string to a Ruby object and attempts to save it to the database after checking the params in the article_params helper method. If it is saved successfully, Rails will render the show method. Otherwise it returns the error messages with a status of :unprocessable_entity which corresponds to status code 422.</p>
+<p>PUT and PATCH requests are handled similarly as a POST request. PUT is intended to update an entire record while PATCH is intended to update only parts of a record. Rails maps them both to the "update" action so it doesn't matter which you use. However, since Rails itself is responsible for setting the updated_at attribute and created_at will not be changed, it's technically more correct to use the PATCH method.</p>
+<p>DELETE requests are triggered regardless of format (HTML or JSON). However, you need to specify the JSON format to get the right response, which in this case is no content at all. Otherwise it will be a redirect to the articles_url which will return a response of all the HTML from the index page.</p>
+
+<h4>Seed the Database</h4>
+<li>Add some seed data. Something like the below.</li>
+<pre>
+# db/seed.rb
+articles = Article.create([
+  {title: "Learn Ruby", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."},
+  {title: "Learn Rails", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."},
+  {title: "Learn React", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."}
+])
+</pre>
+<p class="dlr"><code>rails db:seed</code></p>
+
+<h4>Run the Server</h4>
+<p>We should be able to view our articles in both HTML and JSON formats.</p>
+<li class="dlr"><code>rails server -p 3001</code> - Start the server on port 3001</li>
+<li>View the articles index page at http://localhost:3001/articles</li>
+<li>View the same data in JSON format at http://localhost:3001/articles.json</li>
+<li>View the details of article id 3 in JSON format at http://localhost:3001/articles/3.json</li>
+<br>
+
+<h3>CORS and Security</h3>
+<p>GET requests can be made to your API but POST, PUT, and DELETE requests will return an error code of 422 Unprocessable Entity. Rails uses the same-origin security policy which forbids "cross-domain" requests by default. Cross-domain requests are requests coming from a different domain than the server, so in this case from any domain other than localhost:3001. A web application can use the Cross-Origin Resource Sharing (CORS) system to allow AJAX requests like POST, PUT/PATCH, and DELETE from a separate domain. It uses information passed with HTTP headers.</p>
+<p>To enable CORS we need to add the <a href="https://github.com/cyu/rack-cors">rack-cors</a> gem to our Gemfile. This is CORS middleware for Rack compatible web applications like Rails. In the gemfile add:
+<pre>
+# Gemfile
+gem 'rack-cors'
+</pre>
+<p>Then install it.</p>
+<p class="dlr"><code>bundle install</code></p>
+Then configure it:</p>
+<pre>
+# config/application.rb
+module ArticlesAppWithApi
+  class Application < Rails::Application
+    ...
+    config.middleware.insert_before 0, Rack::Cors do
+      allow do
+        origins 'http://localhost:3000' #1
+        resource '*', :headers => :any, :methods => [:get, :post, :put, :patch, :delete, :options] # 2
+      end
+    end
+  end
+end
+</pre>
+<p>
+1) Origins: whitelists what domains are allowed to make restricted requests. For any origin use '*'. Otherwise list the specific domains such as 'http://localhost:3000' or http://www.example.com. <br>
+2) resource: specify which resource or resources the access applies to. '*' means it applies to the whole site. You can also specify which HTTP methods are allowed.</p>
+
+<h4>Cross Site Request Forgery protection</h4>
+<p>In addition to allowing CORS access above, in the controller we disabled a built-in Rails Cross Site Request Forgery protection feature when we added this statement: <code>protect_from_forgery unless: -> { request.format.json? }</code>.</p>
+<p>With this security feature, post, patch/put, and delete requests from rails forms or pages include an authenticity token. In a standard Rails app those are submitted as a hidden field with the form. But if we are using a form submitted to our API from a React front end, Rails won't generate the security token. So we need to disable that security feature for JSON requests.</p>
+<p>So how do you restrict who can make write requests to the API? We already are restricting what domain they can come from but what about restricting what users can access the API endpoints? There are methods to do that such as using JSON Web Tokens. We will cover that in <a href="rails_react_jwt">Rails React and JWTs</a>.</p>
+
+<!-- Test API with Curl and Postman -->
+<hr class="space" id="curl">
+<h3>Test your API with Curl or Postman</h3>
+<h5>Curl</h5>
+<p>We're not done with our API until we know all the endpoints we created work. I'll discuss two ways we can do this. First is using Curl.</p>
+<p>Curl is a command line utility that lets you make HTTP requests from the Terminal instead of from a web page. Curl comes preloaded with Macs. For Windows you may need to install it, but it's a handy tool sometimes.  Let's make a POST request by entering the below Curl command. The -H option is for the header which is where we tell the receiver that the data we are sending is in JSON format. The -X option specifies the request method, POST in this case. The -d option is where we put our data, so you won't use the -d option with GET or DELETE requests. And of course we include the URL.</p>
+
+<li class="dlr"><code>rails s -p 3001</code> Make sure you start the server if it's not already running</li>
+<p class="dlr"><code>curl -H "Content-Type: application/json" -X POST -d '{"title":"Learn JavaScript","content":"Lorem ipsum."}' http://localhost:3001/articles.json</code></p>
+<p>If it posted the server should send a response back with the new Article data in JSON format. It will have the title and content fields as you submitted, but it will also have id, created_at, and updated_at fields. You can also make a Curl GET request with the new ID:</p>
+<p class="dlr"><code>curl -X GET http://localhost:3001/articles/4.json</code> - change the id to the correct one if it's not 4.</p>
+<p>Now let's update this record with a PATCH request:</p>
+<p class="dlr margin"><code>curl -H "Content-Type: application/json" -X PATCH -d '{"title":"Learn ES6","content":"Lorem ipsum."}' http://localhost:3001/articles/4.json</code></p>
+<p>It returns a JSON string of the saved updated article data. Now, let's delete it:</p>
+<p class="dlr"><code>curl -X DELETE http://localhost:3001/articles/4.json</code></p>
+<p>In our controller destroy action we specified to return no content, so it won't give you confirmation that it was deleted. But, if you try to do a GET request on it will throw you an error.</p>
+
+<hr class="space" id="postman">
+<h5>Postman</h5>
+
+<p>If you don't like the cryptic feel of sending HTTP requests from the command line, there is a popular free desktop application called Postman that lets you do the same thing from a GUI interface. You can download it from <a href="https://www.getpostman.com/downloads/">getpostman.com</a>. The tool is fairly intuitive but you will need to play around with it a bit to get comfortable with it. If you plan on building a lot of APIs Postman is an essential tool. Here are the CRUD actions hitting our API's endpoints:</p>
+<ul>
+  <li>Get Articles request: GET http://localhost:3001/api/articles</li>
+  <li>Get Article request: GET http://localhost:3001/api/articles/<i>article._id</i></li>
+  <li>Add Article request: POST http://localhost:3001/api/articles <br>
+    Headers: Content-Type application/json <br>
+    Body: {"title": "Learn Web Development", "content": "Lorem ipsum."}
+  </li>
+  <li>Update Article request: PATCH http://localhost:3001/api/articles/<i>article._id</i> <br>
+    Headers: Content-Type application/json <br>
+    Body: {"title": "Learn APIs", "content": "Blah Blah Blah."}
+  </li>
+  <li>Delete Article request: DELETE http://localhost:3001/api/articles/<i>article_id</i></li>
+</ul>
+<!-- <p>For POST and PATCH/PUT requests click on the body tab. You can enter the fields in JSON format, or select the x-www-form-urlencoded option and then you can enter each field as key value pairs.</p> -->
+
+<hr class="space" id="active-model-serializers">
+<p>You now have a working Rails API. You can move on to the next section of this series <a href="react_crud_app">React Front End</a>. Or you can continue on and explore more about Rails APIs. We will briefly cover three more topics, including rebuilding our Rails app as an API only application in under five minutes.</p>
+<h3>Active Model Serializers</h3> 
+<p>Serialization in the context of a web application is the process of converting data objects into a format like a JSON string that can transmitted across a network or the internet and deserialized back into a data object when it is received. We used the JBuilder gem as our serializer above, but there are other options. A popular one is a gem called Active Model Serializers (AMS). For reference, AMS docs are on <a href="https://github.com/rails-api/active_model_serializers/tree/v0.10.6/docs">github.com</a>. While JBuilder approached serialization through it's view files, AMS approaches it like a model.</p>
+<p>Before going into the details of AMS it is worth mentioning that in February 2018 Netfix released a similar gem called fast_jsonapi that is supposed to be very fast. The concept is similar to AMS so we'll continue with the instructions for AMS since it's tried and true. You can read more about fast_jsonapi on their <a href="https://github.com/Netflix/fast_jsonapi">Github page</a>.</p>
+<p>First, install the AMS gem. You can uninstall the JBuilder gem at the same time if don't use it.</p>
+<pre>
+# Gemfile
+gem 'active_model_serializers'
+</pre>
+<p class="dlr"><code>bundle install</code></p>
+<p>Then when you generate a resource or scaffold, the generator will also create an app/serializers/article_serializer.rb file.
+Or if you already created the article resource you can generate the serializer separately with or without specifying the attributes:
+<li class="dlr"><code>rails g serializer article</code></li> </p>
+<li class="dlr"><code>rails g serializer article title content</code></li> </p>
+<p>This is the file it generates:</p>
+<pre>
+# app/serializers/article_serializer.rb 
+class ArticleSerializer < ActiveModel::Serializer
+  attributes :id, :title, :content
+end
+</pre>
+<p>Your controller would look something like this. In this case we are assuming you are only returning JSON format, not HTML and JSON both.</p>
+<pre>
+# app/controllers/articles_controller.rb 
+class ArticlesController < ApplicationController
+  protect_from_forgery unless: -> { request.format.json? }
+
+  def index
+    @articles = Article.all
+    render json: @articles
+  end
+
+  def show
+    @article = Article.find(params[:id])
+    render json: @article
+  end
+
+  def create
+    @article = Article.new(article_params)
+    if @article.save
+      render json: @article, status: :created
+    else
+      render json: @article.errors, status: :unprocessable_entity
+    end
+  end
+
+  def update
+    @article = Article.find(params[:id])
+    if @article.update(article_params)
+      render json: @article, status: :ok
+    else
+      render json: @article.errors, status: :unprocessable_entity
+    end
+  end
+
+  def destroy
+    @article = Article.find(params[:id])
+    @article.destroy
+    head :no_content
+  end
+
+  private
+    def article_params
+      params.require(:article).permit(:title, :content)
+    end
+end
+</pre>
+<p>And you no longer need the JBuilder view files. So you can delete them.</p> 
+<p>That's it. Your API using AMS should now be working. If you start the server on port 3001 and in your browser go to localhost:3001/articles, you should get the JSON output with or without appending .json to the URL.</p>
+
+<hr class="space" id="api-namespace">
+<h3>Add an API namespace</h3>
+<p>Traditional web applications that also provide an API often add an "api" namespace to the URL to distinguish it from a regular URL. So instead of www.example.com/articles, the API URL would be www.example.com/api/articles. And if the API serves a mobile app, it is common to add versions to the api namespace so that changes won't break existing downloaded mobile apps. Something like www.example.com/api/v1/articles.</p>
+<p>There are a couple of approaches to add such a namespace to your app. First is to add a scope to the route. Something like this:</p>
+<pre>
+# config/routes.rb 
+scope '/api' do
+  resources :articles
+end
+</pre>
+<p>Then the URL will include the api namespace, but the controller will not. It will just be the same controller we generated before.</p>
+<p>The second option is to add a namespace to the route, controller, and views (if any). This makes more sense if you are using versioning since you will then have multiple controllers.</p>
+<pre>
+# config/routes.rb 
+namespace :api do
+  namespace :v1 do
+    resources :articles  
+  end
+end
+</pre>
+<p>The controller class name would look like this.</p>
+<pre>
+# app/controllers/api/v1/articles_controller.rb
+class Api::V1::ArticlesController < ApplicationController
+  ...
+end
+</pre>
+
+<hr class="space">
+<!-- rails_api_only -->
+<h3 id="api-only">Rails API-only Application</h3>
+<p>Beginning with Rails 5.0 you have the option of generating an API only application instead of the traditional Rails app. A Rails API-only app is a slimmed down version of a regular Rails web app, skipping the Asset Pipeline and generation of view and helper files. You can read the details in the <a href="https://guides.rubyonrails.org/api_app.html">Rails Guides - API App</a>.</p>
+
+<h4>Rebuild the App as an API only application</h4>
+<p>We can build the same Articles app as an API only app in less than five minutes. Ready. Go:</p>
+
+<li class="dlr"><code>mkdir <i>appname</i>; cd <i>appname</i></code></li> 
+<li>If you are using RVM for Ruby and Gems version control you can set your gemset at this point.</li>
+<p class='my=0'>To generate an API-only app just add the --api flag</p>
+<li class="dlr"><code>rails new . --api</code></li>
+
+<p>With an API only app you don't need to use the jbuilder or active_model_serializers gems. Rails serializes the JSON format automatically. You can generate a scaffold and it will automatically create a controller that renders JSON. And you don't need to add the <code>protect_from_forgery unless: -> { request.format.json? }</code> statement to your controller.</p>
+
+<li class="dlr"><code>rails generate scaffold Article title:string content:text</code></li>
+<li class="dlr"><code>rails db:migrate</code></li>
+<li>Add some seed data to db/seeds.rb</li>
+<pre>
+# db/seed.rb
+articles = Article.create([
+  {title: "Learn Ruby", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."},
+  {title: "Learn Rails", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."},
+  {title: "Learn React", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."}
+])
+</pre>
+<li class="dlr"><code>rails db:seed</code></li>
+<p class="mt-3 mb-1">Add the rack-cors gem to prevent Rails from blocking cross browser access, since our front end and back end will be running on different ports.</p>
+<pre>
+# Gemfile
+gem 'rack-cors'
+</pre>
+<li class="dlr"><code>bundle install</code></li>
+<pre>
+# config/application.rb
+module ArticlesAppWithApi
+  class Application < Rails::Application
+    ...
+    config.middleware.insert_before 0, Rack::Cors do
+      allow do
+        origins 'http://localhost:3000'
+        resource '*', :headers => :any, :methods => [:get, :post, :put, :patch, :delete, :options]
+      end
+    end
+  end
+end
+</pre>
+<p class='mt-3 mb-1'>Add an "api" namespace to the routes. This will avoid potential route collisions between your back-end api and your front-end react routes.</p>
+<pre>
+# config/routes.rb
+scope '/api' do
+  resources :articles
+end
+</pre>
+
+<li class="dlr"><code>rails server -p 3001</code></li>
+<li>View the JSON data at http://localhost:3001/api/articles</li>
+<p><b>Done!</b></p>
+
+<hr class="space">
+<p>Okay, we have a working API. Or two. Now let's build a separate front-end React application to interact with it. <a href="react_crud_app">On to the next section</a>.</p>
+
+</div>
+</div>
+</body>
+</html>

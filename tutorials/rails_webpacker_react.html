@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Rails Webpacker and React Tutorial</title>
+  <meta name="description" content="Rails tutorial on how to integrate React using the Webpacker gem."> 
+  <meta name="keywords" content="Rails Webpacker, Rails React, Webpacker gem">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Rails with Webpacker React Tutorial</h1>
+  <p>Create a Ruby on Rails application with Webpacker React.</p>
+  <p>By Steve Carey - 8/1/2018</p>
+  <p>Finished code: <a href="https://github.com/steve981cr/rails-with-webpacker-react">Github</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<h2>Introduction</h2>
+
+<!-- react intro -->
+<p>This is part of a series of tutorials on APIs and the React library. See the full list at <a href="../tutorials">Tutorials</a>. Throughout this series we build a Create-Read-Update-Delete (CRUD) application with a React front end and a Ruby on Rails back end. Each section is self-contained.</p>
+
+<p>The first two tutorials treated the <a href="rails_api">Rails API</a> and the <a href="react_crud_app">React client</a> as separate applications running on separate servers. That is a good setup for a Single Page Application. But what if you want to mix the standard Rails Views with some React views all running from the same domain? A good option is to integrate React into your Rails app with the Webpacker gem.</p>
+
+<p>Webpack is an open-source JavaScript pre-processor and module bundler used in conjunction with front-end libraries like React, AngularJS and View.js. It bundles all the .jsx, .sass, .hbs, etc. code into normal .js and .css that browsers understand after it is pre-compiled. It comes with webpack-dev-server which enables hot reloading in the development environment meaning the browser is automatically refreshed every time you save a file. The handy create-react-app generator incorporates Webpack.</p>
+<p>The webpacker gem was created by the Rails team. It is a middleware utility that lets Webpack work within a Rails application. Starting with Rails 5.1, you can automatically enable the Webpacker gem when you create a new application. And you can specify to integrate it specifically for React (or Angular, Vue, Elm, Stimulus).</p>
+<p>In this tutorial we will duplicate the Articles CRUD application we created earlier in the series. It will be the same except for the following differences:</p>
+<li>React will be integrated into our Rails application using the Webpacker gem.</li>
+<li>We will serialize our API with the active_model_serializer gem instead of the jbuilder gem.</li>
+<li>We will add an api namespace to our Rails articles routes.</li>
+<li>We don't need to install the rack-cors gem since React and Rails will be running from the same origin.</li>
+<li>We will use React Router's HashRouter instead of BrowserRouter to avoid conflict with the Rails Router.</li>
+<li>We will use the ES6 native Fetch API rather than React's Axios module for AJAX requests.</li>
+
+<hr class="space">
+<h2>Setup the Application</h2>
+<h4>Generate the Application</h4>
+<p>Let's create a new application enabled with Webpack and React. You need to have node and yarn installed on your computer.</p>
+<li class="dlr"><code>mkdir rails-with-webpacker-react; cd rails-with-webpacker-react</code></li>
+<li>If you are using RVM for Ruby and Gems version control you can set your gemset at this point.</li>
+<p class="dlr"><code>rails new . --webpack=react</code></p>
+<h4>Or Add Webpacker to an Existing Rails Application</h4>
+If you wanted to add webpacker to an existing app, add the webpacker gem:
+<pre>
+# Gemfile
+gem 'webpacker'
+</pre>
+<p class="dlr"><code>bundle install</code></p>
+<p class="mb-0">Then run the webpacker generator to install webpacker:</p>
+<p class="dlr mb-0"><code>rails webpacker:install</code></p>
+<p class="mb-0">Run the webpacker generator to install React:</p>
+<p class="dlr"><code>rails webpacker:install:react</code></p>
+
+<h4>Add the Active Model Serializers gem</h4>
+We could use the JBuilder gem to serialize objects to and from JSON strings like we did in Part 1 of this tutorial. This time though, we will use the Active Model Serializers gem discussed in Part 1. Once installed, Rails will automatically generate a serializer file for us when we generate a scaffold or resourse. Although, if we generate just the model, then we have to generate the serializer separately.
+<pre>
+# Gemfile
+gem 'active_model_serializers'
+</pre>
+<p class="dlr"><code>bundle install</code></p>
+
+
+<h2>Create the Articles resource</h2>
+<p>We'll create an Articles model, database table, routes with an api namespace, and controller serving only JSON. It will have just two attributes, title and content, besides the ID and timestamps that Rails generates. There will be no Rails views for this resourse. We'll handle that with React.</p>
+<li class="dlr"><code>rails generate model Article title:string content:text</code></li>
+<li class="dlr"><code>rails db:migrate</code></li>
+<li class="dlr"><code>rails generate serializer article title content</code></li>
+<p>The last command will generate our serializer for us. It will look like this:</p>
+<pre>
+# app/serializers/article_serializer.rb
+class ArticleSerializer < ActiveModel::Serializer
+  attributes :id, :title, :content
+end
+</pre>
+<p>Add some seed data:</p>
+<pre>
+# db/seed.rb
+articles = Article.create([
+  {title: "Learn Ruby", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."},
+  {title: "Learn Rails", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."},
+  {title: "Learn React", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."}
+])
+</pre>
+<p class="dlr"><code>rails db:seed</code></p>
+<p>Add routes with an "api" namespace.</p>
+<pre>
+# config/routes.rb 
+Rails.application.routes.draw do
+  namespace :api do
+    resources :articles
+  end
+end
+</pre>
+<p>Create a controller file then populate it.</p>
+<li class="dlr"><code>mkdir app/controllers/api; touch app/controllers/api/articles_controller.rb</code></li>
+<pre>
+# app/controllers/api/articles_controller.rb
+class Api::ArticlesController < ApplicationController
+  skip_before_action :verify_authenticity_token
+
+  def index
+    @articles = Article.all
+    render json: @articles
+  end
+
+  def show
+    @article = Article.find(params[:id])
+    render json: @article
+  end
+
+  def create
+    @article = Article.new(article_params)
+    if @article.save
+      render json: @article, status: :created
+    else
+      render json: @article.errors, status: :unprocessable_entity
+    end
+  end
+
+  def update
+    @article = Article.find(params[:id])
+    if @article.update(article_params)
+      render json: @article, status: :ok
+    else
+      render json: @article.errors, status: :unprocessable_entity
+    end
+  end
+
+  def destroy
+    @article = Article.find(params[:id])
+    @article.destroy
+    head :no_content
+  end
+  
+  private
+    def article_params
+      params.require(:article).permit(:title, :content)
+    end
+end
+</pre>
+<p>Okay, our Rails API should be working. You can test it out by starting the server.</p>
+<p class="dlr"><code>rails server</code></p>
+<p>Then go to http://localhost:3000/api/articles. You should see the seeded articles in JSON format. You don't need to add .json to the URL (but you can) since in our controller actions we specify json format in our render. Now stop the server because we have another server solution.</p>
+
+<h2>Foreman</h2>
+<p>We just ran the Rails server like we always have. But when we are using Webpack we need to run two servers. But wait a minute. I thought creating an integrated app would mean we only need to run one server since it's all on one domain? Well, one server will run both our Rails API and our Rails views. And you'll see shortly that the React components are being inserted into a Rails view file. So yes, the Rails API and React served pages will be running on the same server and to the same domain (localhost:3000 in our dev environment). However, we do need to run a separate server for the Webpack build process and to have live code reloading in our browser during development. Webpack dev server runs on localhost:3035 but won't display a view to that port.</p>
+<p>We can use the foreman gem to start both servers with a single command. Foreman is a utility you call from the Terminal so you save it directly to your system, not though your Gemfile.</p>
+<p class="dlr"><code>gem install foreman</code></p>
+<p>Then create a Procfile for your development environment and populate it with the below.</p>
+<li class="dlr"><code>touch Procfile.dev</code></li>
+<pre>
+# Procfile.dev
+web: bundle exec rails s
+webpacker: ./bin/webpack-dev-server
+</pre>
+<p>Now run the server with with <code>foreman start -procfile.dev</code> which defaults to port 5000. If you want to run it on port 3000 then run:</p>
+<p class="dlr"><code>foreman start -f Procfile.dev -p 3000</code></p>
+<p>If you go back to http://localhost:3000/api/articles in your browser and refresh it you should still see the JSON rendering of our articles.</p>
+
+<h2>Pages Controller</h2>
+<p>We need a Rails view to insert the React components. This is where our integrated app differs from the separated Rails and React applications we created in Parts 1 and 2. The React views will be served by the Rails server through a Rails view page (or multiple Rails view pages if you have different React views for different resources). In our case we'll make it simple and just have React interact with one Rails view page. Let's generate the controller with a single action.</p>
+<p class="dlr"><code>rails g controller pages index --no-assets --no-helper</code></p>
+<p>Make that action the root route.</p>
+<pre>
+# config/routes.rb 
+<b>root to: 'pages#index'</b>
+
+namespace :api do
+  resources :articles
+end
+</pre>
+<p>Populate the Rails view file with a single div element with id of "root." And add a javascript pack tag calling a pack called "application." The div is where React will insert it's JSX. The pack tag is what calls our React code.</p>
+<pre>
+# app/views/pages/index.html.erb 
+&lt;div id="root">&lt;/div>
+&lt;%= javascript_pack_tag 'hello_react' %>
+</pre>
+<p>When we generated our application with the webpack option, Rails created a directory we haven't seen before: app/javascript. This is where all the Webpack and React code is. This is a whole application within our Rails application. We still have the app/assets/javascripts folder as part of the asset pipeline. That is where you put miscellaneous JavaScript code for our regular Rails views. Inside app/javascript you'll see a folder called packs with two files: application.js and hello_react.js. The second file is what we are calling with &lt;%= javascript_pack_tag 'hello_react' %>. Now go to the browser. If the server is still running then go to localhost:3000 and you should see "Hello React." React is working!</p>
+<p>The hello react file is just to see if it works. We'll use the 'application' pack file instead. Change the index page to:</p>
+<pre>
+# app/views/pages/index.html.erb 
+&lt;div id="root">&lt;/div>
+&lt;%= javascript_pack_tag <b>'application'</b> %>
+</pre>
+
+<hr class="space">
+<h2>React Setup</h2>
+<p>Now lets switch to the React portion of our code. We went into detail about React in part 2 of this tutorial so we'll only add explanations for anything that is different. First let's add any packages we need. Right now we only need one, react-router-dom. We aren't loading the axios package like we did in Part 2 because we'll be using the ES6 fetch API for our AJAX calls so no additional package is needed. We can still use Axios of course, but it will be interesting to see how we do it with Fetch.</p>
+<p class="dlr"><code>yarn add react-router-dom</code></p>
+<h4>File Structure</h4>
+<p>Let's set up our file structure. You can use these Unix commands (or do it manaually in your text editor).</p>
+<pre>
+rm app/javascript/packs/hello_react.jsx
+mv app/javascript/packs/application.js app/javascript/packs/application.jsx
+mkdir app/javascript/components
+touch app/javascript/components/App.jsx
+touch app/javascript/components/Home.jsx
+touch app/javascript/components/ArticleList.jsx
+touch app/javascript/components/ArticleInfo.jsx
+touch app/javascript/components/ArticleAdd.jsx
+touch app/javascript/components/ArticleEdit.jsx
+</pre>
+<p>We removed the hello_react file. We renamed the application.js file to application.jsx since it will be containing JSX. Nothing special about the name "application." We could call it "articles.jsx" if we had multiple packs. JavaScript files in the packs folder are referred to as "packs." They serve as entry points to our front-end code. Think of packs as bridges between your Rails views and your React components. Application.jsx is the equivalent of the src/index.js file generated by create-react-app from the Part 2 tutorial. We are calling it from the app/views/pages/index.html.erb file.</p>
+<p>We need a folder to hold our components. Since our app is small we just put all our components in one folder called components. Note that our components folder is a sibling to, and not inside the packs folder.</p>
+
+<h4>Assets</h4>
+<p>We still have our Rails asset pipeline and since we are calling our React components from a traditional Rails view file, it has access to all the classes in the app/assets/stylesheets directory. For convenience we'll leverage the Bootstrap CDN from our Rails stylesheet (after changing the extenson to scss). Feel free to use your own styles if you prefer, or to load the Bootstrap gem. You could also put the CDN link in the app/views/layouts/application.html.erb file head element if you prefer.</p>
+<li class="dlr"><code>mv app/assets/stylesheets/application.css app/assets/stylesheets/application.scss</code></li>
+<pre>
+# app/assets/stylesheets/application.scss
+@import url('https://stackpath.bootstrapcdn.com/bootstrap/4.1.2/css/bootstrap.min.css');
+</pre>
+<p>If you wanted to put some or all of your stylesheets in with your React code you can do that. You would just make a directory in the packs folder</p>
+<p class="dlr"><code>mkdir app/javascript/packs/stylesheets</code></p>
+<p>Then add one or more css or scss files in there. However you will need to call these from the Rails view with a stylesheet pack tag. If your css file was app/javascripts/packs/stylesheets/application.css you could call it from your Rails view file with <code>&lt;%= stylesheet_pack_tag 'stylesheets/application' %></code></p>
+
+<hr class="space">
+<h2>React Components</h2>
+<p>Let's set up our React front end like we did in the last tutorial. Start with the pack file. We'll change this shortly but let's make sure it's going to work first.</p>
+<pre>
+# app/javascript/packs/application.jsx
+import React from 'react';
+import ReactDOM from 'react-dom';
+import Home from '../components/Home';
+
+ReactDOM.render(&lt;Home />, document.getElementById('root'));
+</pre>
+
+<p>Populate the Home component.</p>
+<pre>
+# app/javascript/components/Home.jsx
+import React from 'react';
+
+const Home = (props) => {
+  return (
+    &lt;div className="jumbotron">
+      &lt;h1>Home Page&lt;/h1>
+    &lt;/div>
+  );
+}
+
+export default Home;
+</pre>
+<p>We need to restart the server this time. Ctrl+C to stop.</p>
+<p class="dlr"><code>foreman start -f Procfile.dev -p 3000</code></p>
+<p>Now go to http://localhost:3000 and you should see Home Page. Now that we know it's working, change the pack file to point to App.jsx instead of Home.jsx:</p>
+<pre>
+# app/javascript/packs/application.jsx
+import React from 'react';
+import ReactDOM from 'react-dom';
+import App from '../components/App';
+
+ReactDOM.render(&lt;App />, document.getElementById('root'));
+</pre>
+
+<hr class="space">
+<h4># src/components/App.jsx</h4>
+<p>Lets set up the App component that contains our Router and an element to insert our various CRUD components when called. This component will be the same as in Part 2 of this tutorial, except we will use React Router's HashRouter instead of the BrowserRouter. HashRouter will insert a hash sign # in our routes to distinguish React Routes from Rails Routes. Without it, since our front end and API are now in the same domain, Rails would be trying to match the URL to the routes set in the config/routes.rb file. It won't find them. That is a downside of integrating React with the Rails app. If you don't like the hash signs in your URLs, it is out of scope for this tutorial, but there are other workarounds that require some configuration changes.</p>
+<pre>
+# app/javascript/components/App.jsx 
+import React, { Component } from 'react';
+import Home from './Home';
+import ArticleList from './ArticleList';
+import ArticleAdd from './ArticleAdd';
+import ArticleInfo from './ArticleInfo';
+import ArticleEdit from './ArticleEdit';
+import {HashRouter as Router, Route, NavLink, Switch} from 'react-router-dom'
+
+class App extends Component {
+  render() {
+    return (
+      &lt;div className="App">
+        &lt;Router>
+          &lt;div className="container">
+            &lt;Navigation />
+            &lt;Main />
+          &lt;/div>
+        &lt;/Router>
+      &lt;/div>
+    );
+  }
+}
+
+const Navigation = () => (
+  &lt;nav className="navbar navbar-expand-lg navbar-dark bg-dark">
+    &lt;ul className="navbar-nav mr-auto">
+      &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/">Home&lt;/NavLink>&lt;/li>
+      &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/articles">Articles&lt;/NavLink>&lt;/li>
+    &lt;/ul>
+  &lt;/nav>
+);
+
+const Main = () => (
+  &lt;Switch>
+    &lt;Route exact path="/" component={Home} />
+    &lt;Route exact path="/articles" component={ArticleList} />
+    &lt;Route exact path="/articles/new" component={ArticleAdd} />
+    &lt;Route exact path="/articles/:id" component={ArticleInfo} />
+    &lt;Route exact path="/articles/:id/edit" component={ArticleEdit} />
+  &lt;/Switch>
+);
+
+export default App;
+</pre>
+<p>Save the above code to the App.jsx file, and now in your browser and you should see the Home Page along with a navigation bar.</p>
+
+<hr class="space">
+<h4># src/components/ArticleList.jsx</h4>
+<p>Now let's see if our API connection is working. Populate the ArticleList file.</p>
+<pre>
+import React, { Component } from 'react';
+import { Link } from 'react-router-dom';
+
+class ArticleList extends Component {
+  constructor() {
+    super();
+    this.state = { articles: [] };
+  }
+
+  componentDidMount() {
+    fetch('api/articles')
+      .then(response => response.json())
+      .then(data => {
+        this.setState({articles: data});
+      })
+      .catch(error => console.log('error', error));
+  }
+  render() {
+    return (
+      &lt;div>
+        {this.state.articles.map((article) => {
+          return(
+            &lt;div key={article.id}>
+              &lt;h2>&lt;Link to={`/articles/${article.id}`}>{article.title}&lt;/Link>&lt;/h2>
+              {article.content}
+              &lt;hr/>
+            &lt;/div>
+          )
+        })}
+        &lt;Link to="/articles/new" className="btn btn-outline-primary">Create Article&lt;/Link> 
+      &lt;/div>
+    );
+  }
+}
+
+export default ArticleList;
+</pre>
+<p>There are two differences from the previous version. First is the URL. The call to the API is not the full URL, it's just the path. That's due to the Webpacker integration. We also now have the "api" namespace. And we don't need to append .json to the URL since the controller actions are now rendering only JSON.</p>
+<p>Second is we are using the ES6 fetch API to make our AJAX type calls to the server. So we don't have to import the Axios library or any library since fetch is build into JavaScript now. Let's compare the componentDidMount() method using Axios vs using Fetch.</p>
+<pre>
+// Using Axios
+componentDidMount() {
+  axios.get('api/articles')
+    .then(response => { 
+      this.setState({articles: response.data});
+    })
+    .catch(error => console.log('error', error));
+} 
+
+// Using Fetch
+componentDidMount() {
+  fetch('api/articles')
+    .then(response => response.json())
+    .then(data => {
+      this.setState({articles: data});
+    })
+    .catch(error => console.log('error', error));
+}
+</pre>
+<p>The only difference is with fetch there is an extra step: <code>.then(response => response.json())</code>. Here ES6 promises waits for the HTTP response back from the server after your fetch request. Then the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Body/json">json() method</a> collects the "body" stream from the response and parses it from JSON text into JavaScript, and returns the result to the next step.</p> 
+<p>Axios does this step for you. For one extra line of code with fetch you don't need another library, and in this basic tutorial both Axios and Fetch perform the same. However, as your application gets more complex you may find Axios has some capabilities that fetch does not, so which you use depends on what you need. Good to know both ways regardless.</p>
+
+<hr class="space">
+<h4># src/components/ArticleInfo.jsx</h4>
+<p>Populate the ArticleInfo file. Again the same as the previous tutorial except for the API URL and the use of Fetch. Save it and confirm it's working in the browser. The delete and close buttons should both be working as well (but not edit).</p>
+<pre>
+import React, { Component } from 'react';
+import { Link } from 'react-router-dom';
+
+class ArticleInfo extends Component {
+  constructor() {
+    super();
+    this.state = { article: {} };
+    this.handleDelete = this.handleDelete.bind(this);
+  }
+
+  componentDidMount() {
+    fetch(`api/articles/${this.props.match.params.id}`)
+      .then(response => response.json())  
+      .then(data => {
+          this.setState({article: data});
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  handleDelete() {
+    fetch(`api/articles/${this.props.match.params.id}`, {method: 'DELETE'})
+      .then(() => {
+        this.props.history.push("/articles")
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  render() {
+    return (
+      &lt;div>
+        &lt;h2>{this.state.article.id}: {this.state.article.title}&lt;/h2>
+        &lt;p>{this.state.article.content}&lt;/p>
+        &lt;p>
+          &lt;Link to={`/articles/${this.state.article.id}/edit`} className="btn btn-outline-dark">Edit&lt;/Link> 
+          &lt;button onClick={this.handleDelete} className="btn btn-outline-dark">Delete&lt;/button> 
+          &lt;Link to="/articles" className="btn btn-outline-dark">Close&lt;/Link>
+        &lt;/p>
+        &lt;hr/>
+      &lt;/div>
+    )
+  }
+}
+
+export default ArticleInfo;
+</pre>
+
+
+<hr class="space">
+<h4># src/components/ArticleAdd.jsx</h4>
+<p>Populate the ArticleAdd component file. POST and PATCH/PUT requests are sending data to the API so the fetch call needs to include the header property telling the API that you are sending data in JSON format. The body property contains that data you are sending. You need to convert the form data from a JavaScript object to a JSON string using the JSON.stringify() method.</p>
+<pre>
+import React, { Component } from 'react';
+
+class ArticleAdd extends Component {
+  constructor() {
+    super();
+    this.state = { title: '', content: ''};
+    this.handleChange = this.handleChange.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this);
+    this.handleCancel = this.handleCancel.bind(this);
+  }
+
+  handleSubmit(event) {
+    event.preventDefault();
+    fetch('api/articles', {
+        method: 'POST',
+        body: JSON.stringify(this.state),     
+        headers: {'Content-Type': 'application/json' }
+      })
+      .then(response => response.json())
+      .then(data => {
+        this.props.history.push(`/articles/${data.id}`);
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  handleChange(event) {
+    this.setState({ [event.target.name]: event.target.value });
+  }
+
+  handleCancel() {
+    this.props.history.push("/articles");
+  }
+
+  render() {
+    return (
+      &lt;div>
+        &lt;h1>Create Article Post&lt;/h1>
+        &lt;form onSubmit={this.handleSubmit}>
+          &lt;div className="form-group">
+            &lt;label>Title&lt;/label>
+            &lt;input type="text" name="title" value={this.state.title} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="form-group">
+            &lt;label>Content&lt;/label>
+            &lt;textarea name="content" rows="5" value={this.state.content} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="btn-group">
+            &lt;button type="submit" className="btn btn-dark">Create&lt;/button>
+            &lt;button type="button" onClick={this.handleCancel} className="btn btn-secondary">Cancel&lt;/button>
+          &lt;/div>
+        &lt;/form>
+      &lt;/div>
+    );
+  }
+}
+
+export default ArticleAdd;
+</pre>
+<p>Create and delete a few articles to make sure it's working. Then on to the last component.</p>
+
+<hr class="space">
+<h4># src/components/ArticleEdit.jsx</h4>
+<p>Like with Axios you can use either the PATCH or PUT HTTP method to submit updates. Add the below code to the ArticleEdit component.</p>
+<pre>
+import React, { Component } from 'react';
+
+class ArticleEdit extends Component {
+  constructor() {
+    super();
+    this.state = { title: '', content: ''};
+    this.handleChange = this.handleChange.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this);
+    this.handleCancel = this.handleCancel.bind(this);
+  }
+
+  componentDidMount() {
+    fetch(`api/articles/${this.props.match.params.id}`)
+      .then(response => response.json())
+      .then((data) => {
+        this.setState(data);
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  handleSubmit(event) {
+    event.preventDefault();
+    fetch(`api/articles/${this.props.match.params.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(this.state),   
+        headers: { 'Content-Type': 'application/json' }
+      })
+      .then(response => response.json())
+      .then(data => {
+        this.props.history.push(`/articles/${this.state.id}`);
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  handleChange(event) {
+    this.setState({ [event.target.name]: event.target.value });
+  }
+
+  handleCancel() {
+    this.props.history.push(`/articles/${this.state.id}`);
+  }
+
+  render() {
+    return (
+      &lt;div>
+        &lt;h1>Edit {this.state.title}&lt;/h1>
+        &lt;form onSubmit={this.handleSubmit}>
+          &lt;div className="form-group">
+            &lt;label>Title&lt;/label>
+            &lt;input type="text" name="title" value={this.state.title} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="form-group">
+            &lt;label>Content&lt;/label>
+            &lt;textarea name="content" rows="5" value={this.state.content} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="btn-group">
+            &lt;button type="submit" className="btn btn-dark">Update&lt;/button>
+            &lt;button type="button" onClick={this.handleCancel} className="btn btn-secondary">Cancel&lt;/button>
+          &lt;/div>
+        &lt;/form>
+      &lt;/div>
+    );
+  }
+}
+
+export default ArticleEdit;
+</pre>
+<p>Now test it out. You should have a fully functioning CRUD app with a Ruby on Rails back end and React front end. This time in an integrated application running in the same domain. Cheers.</p>
+
+</div>
+</body>
+</html>

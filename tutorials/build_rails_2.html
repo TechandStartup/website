@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Build your own Ruby on Rails Tutorial</title>
+  <meta name="description" content="Learn Ruby and Rails by building your own simple web framework. Tutorial"> 
+  <meta name="keywords" content="Ruby on Rails, Web Framework Tutorial">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>File Structure <small style="padding-left: 25px;">Build Your Own Rails - Part 2</small></h1>
+  <p>Learn Ruby and Rails by building your own very simplistic Rails-like Framework.</p>
+  <p><a href="build_rails_1">Back to Part 1</a> | <a href="build_rails_3">On to Part 3</a> <br>
+    Finished Code for the entire project: <a href="https://github.com/steve981cr/jailsfolder">github.com/steve981cr/jailsfolder</a>
+  </p>
+</div>
+
+<div class="slightly-shrink-font">
+<!-- Check out autoload. See gems-mine/mini-rails-apps/mini-rails2/lib/active_record.rb -->
+<!-- See jailsfolder/jailsapp/docs/files.rb for lots of notes and instructions on Ruby file stuff -->
+<p>Let's lay out the file structure typical for an MVC architecture but using the Rails flavor. We'll keep our rackapp for reference but we'll create a new directory in our jailsfolder to hold a Blog application. As we build that app, we'll keep the code that can be applied to multiple resources in a separate <i>lib</i> folder. In our last step we will separate that lib folder into a separate gem.</p>
+<h3>Gemfile and Bundler</h3>
+Docs: <a href="http://bundler.io/docs.html">bundler.io/docs</a>
+<p>Bundler is a Ruby gem that is bundled together with Ruby. So if you have Ruby you have bundler. It is the default gem dependency manager for Ruby projects. It uses a file called Gemfile where you declare what gems your library or app uses, and where to find them (the official ruby gems repository is rubygems.org). Given a list of gems, it can automatically download and install them and their dependency gems. Before installing gems, it checks the versions of each of them to make sure they are compatible and can all be loaded at the same time. After the gems have been installed, Bundler can help you update some or all of them when new versions become available. Bundler creates and maintains a companion to Gemfile called Gemfile.lock where it records the exact versions of all the gems installed for the application.</p>
+<p>To see what version of Bundler you have:<br>
+<code>bundler --version</code><br>
+You can check what the latest version is at <a href="https://rubygems.org/gems/bundler">rubygems.org/gems/bundler</a><br>
+If there's a newer version you can update it with:<br>
+<code>gem update bundler</code></p>
+<p>Create a Gemfile using bundler:<br>
+<code class="pre">bundle init</code><br>
+Add the rack gem to it. And let's add the puma gem as well so we can use the puma server instead of Webrick. Like Bundler, Webrick is a gem that comes bundled with Ruby so if you have Ruby you have the Webrick server. It is also the default server for Rack. However, Webrick is only meant for use in development or for small loads in production. Puma, on the other hand is meant to be used in both development and production. Just adding the puma gem will change the server to puma.
+<pre>
+<b># Gemfile</b>
+# Ruby webserver interface.
+gem "rack"
+# Ruby webserver - works in development and production.
+gem "puma"
+</pre>
+<code>bundle install</code></p>
+
+<hr class="space">
+<h3 id="unix">UNIX commands</h3>
+<p>We'll be using UNIX commands throughout this tutorial when working in the terminal. The terminal is a UNIX shell that lets you access the operating system using the command line instead of a graphical user interface (GUI). The default terminal on a Mac is a UNIX shell called Bash. PCs have a shell called PowerShell, but you can also install the Bash UNIX shell. Of course you can use your computer's GUI for managing your files and directories. But since we need to use the terminal anyway, this tutorial includes the UNIX commands for working with files and directories: </p>
+<p>
+<code class="cli">cd <i>path/to/directory</i></code> - Change Directory. <br>
+  <span class="indent"><code class="cli">cd <i>../</i></code> - Two dots goes up one directory.</span> <br>
+  <span class="indent"><code class="cli">cd <i>./</i></code> - One dot is the current directory.</span> <br>
+  <span class="indent"><code class="cli">cd <i>/path/from/root</i></code> - Start from your computer's root directory.</span> <br>
+  <span class="indent"><code class="cli">cd <i>~/path/from/home-directory</i></code> - Start from your home directory.</span> <br>
+<code class="cli">pwd</code> - Present working directory. Returns the absolute path to the directory you are in. <br>
+<code class="cli">ls</code> - Lists the files in the current directory. <br>
+<code class="cli">ls <i>path/to/directory</i></code> - Lists the files in the directory given. <br>
+<code class="cli">mkdir <i>directory-name</i></code> - Make Directory. Creates a directory. <br>
+<code class="cli">rmdir <i>directory-name</i></code> - Remove Directory. Deletes a directory. <br>
+<code class="cli">touch <i>filename</i></code> - Creates a new file if it doesn't exist already.<br>
+<code class="cli">mv <i>filename</i> <i>path/to/location/filename</i></code> - Moves a file from one location to the given location.<br>
+<code class="cli">mv <i>filename</i> <i>new-filename</i></code> - Changes the name of a file using the move command, if the origin and destination directory are the same.<br>
+You can put two commands on the same line if you end the first with a semicolon.
+<!-- Rather than indicate something is a command line code with a <i>$</i>, we'll just use background color to indicate all code. -->
+<!-- <i>$</i> is a commonly used indicator that means command line code. -->
+</p>
+
+<hr class="space">
+<h3>Set up your app's file structure</h3>
+<p>We are creating a Web application framework using the Model-View-Controller architecture. The Model part of MVC manages the data and business logic. The View is the output representation of information. The Controller accepts input and converts it to commands for the model and/or view. The MVC architecture is frequently used on desktop graphical user interfaces (GUIs), web applications and mobile apps. With web applications, the router matches a URL path with a controller action, which in turn sends commands to the model and view.</p>
+<p>We will be creating both the MVC framework and an app that uses it. Initially they will be part of the same project, a Blog application. We'll keep the framework code separated in a lib (short for library) folder from the rest of the Blog app. Only in the final step will we separate out the framework library from the app.</p>
+<p>Go to the terminal, stop the server (Control+C), and using the change directory command to go back to the jailsfolder <code>cd ..</code> <br>
+To confirm you are in the jailsfolder you can use the <code>pwd</code> command).<br>
+Create a directory called blog and cd into it:<br>
+<code>mkdir blog; cd blog</code>
+<p>Now let's create our application's file structure. First create the Jails library folders and files. These are our framework specific files that will ultimately be separated out into a separate gem. From the terminal create the following directories and files.</p>
+<pre>
+mkdir lib
+touch lib/jails.rb
+mkdir lib/jails
+touch lib/jails/support.rb
+touch lib/jails/controller.rb
+touch lib/jails/routing.rb
+touch lib/jails/hacktive_record.rb
+</pre>
+
+<p>Now make the application skeleton directories and files. These will be the same for any app using our framework.</p>
+<pre>
+# Same files we used for our rackapp:
+touch config.ru
+mkdir config
+touch config/application.rb
+# Additional files and directories
+mkdir app
+mkdir app/assets
+mkdir app/assets/images
+mkdir app/assets/javascripts
+mkdir app/assets/stylesheets
+touch app/assets/stylesheets/application.css
+mkdir app/controllers
+mkdir app/models
+mkdir app/views
+mkdir app/views/layouts
+touch config/boot.rb
+touch config/routes.rb
+mkdir db
+mkdir db/migrate
+</pre>
+
+<p>Finally, we'll make some directories and files that are specific to our Blog application.</p>
+<pre>
+touch app/controllers/pages_controller.rb
+touch app/views/layouts/_head.html.erb
+touch app/views/layouts/_navbar.html.erb
+mkdir app/views/pages
+touch app/views/pages/home.html.erb
+touch app/views/pages/about.html.erb
+touch app/views/pages/user.html.erb
+</pre>
+
+<hr class="space">
+<h3>Blog and Jails namespaces</h3>
+<p>Now that we have created a separate file structure for our application and our framework, let's add a namespace to our application's code. Instead of Application it will be Blog::Application which we'll explain shortly. In the rackapp, we started our application in the config.ru file by calling the Rack <i>run(Application.new)</i> method. Let's change that to <i>run(Blog::Application.new)</i>. Our config.ru file should look like this:</p>
+<pre>
+<b># config.ru</b>
+require_relative('config/application.rb')
+
+# Set default Content-Type response header.
+use(Rack::ContentType, "text/html")
+# Automatically reload the application when a *.rb file is changed in development.
+use(Rack::Reloader, 0)
+# Serve static files from app/assets
+use(Rack::Static, :urls => ["/stylesheets", "/javascripts", "/images"], :root => "app/assets")
+
+# Rack method to instantiate a new Blog::Application object.
+run(<b>Blog::Application.new</b>)
+</pre>
+<p>In our simple rackapp, the application's code resided in the config/application.rb file. But now we are moving the call method out of the application and into the Jails library (our MVC framework). And we'll access it in our app by inheriting it.</p>
+<pre>
+<b># config/application.rb</b>
+require_relative('boot.rb')
+
+module Blog
+  class Application < Jails::Application
+  end
+end
+</pre>
+<p><b>Namespacing:</b> Notice we put our Application class inside a module called Blog. One of the uses of a module is to create a namespace to hold related classes such as those specific to our Blog application. Also notice that the Application class is inheriting from Jails::Application. The double colons is the Ruby syntax indicating that the Application class is embedded in the Jails module. We'll explain the <i>require boot</i> at the top shortly, but first where does our <i>call</i> method go? It's still going to be in the Application class but will be in the Jails MVC framework version. Let's make that now:</p>
+<pre>
+<b># lib/jails.rb</b>
+require_relative('jails/support.rb')
+require_relative('jails/routing.rb')
+require_relative('jails/controller.rb')
+require_relative('jails/hacktive_record.rb')
+
+module Jails
+  class Application
+    # Instantiate a Request object, return Response object.
+    def call(env)
+      request = Rack::Request.new(env)
+      response = Rack::Response.new(["Rack Response Works!"], 200, {"Content-Type" => "text/html"})
+      return response
+    end
+  end
+end
+</pre>
+<p>We created a folder called lib, which is short for library. Libraries are modules that contain reusable code. In Ruby, third party libraries are packaged as gems. You can make your own library and put it in the lib folder. We want to create a library to perform our MVC framework functions so that it can apply to mulitiple resources in the same app such as an articles resource, a comments resource, a user resource, etc. You can have multiple libraries that serve different functions so to distinguish this library from any others we might add, we need to give it a name. We will call our library "jails."</p> 
+<p>In the lib folder we created a file called jails.rb. And we created a directory called jails and put multiple files in it. The require methods at the top of the jails.rb file will give us access to the classes and modules in those files. </p>
+<p>Remember, the Application class now inherits from Jails::Application (i.e., the Application class in the Jails module namespace) and we moved our <i>call</i> method there. The <i>call</i> method is called by Rack when an HTTP request is made to pur app's server. Right now the call method contains our entire app but in the next part we'll move most of the code out into the Blog app files. So the call method will then just hold statements that apply to any using our framework. For that reason we put <i>call</i> in our Jails framework library and inherit it in the application.</p>
+<!-- <p>We also added a class method to the Application class called root, which will return the full path to the app's root directory. We will be calling it from the controller class to help get the full path to our HTML files. Since it is an Application class method, we'll call it with <i>Application.root</i>.</p>  -->
+
+<hr class="space">
+<h3>Booting Up</h3>
+<p>You'll need to require the various files in the app and lib folders to have access to them. Let's automate that. We'll put that in a separate boot.rb file and require it in our config/application.rb file so it's called as part of the initial <i>rackup</i> command. Recall we already added the require to the top of the config/application.rb <code>require_relative('boot.rb')</code>. Now populate the boot file:</p>
+<pre>
+<b># config/boot.rb</b>
+require_relative('routes.rb')
+require_relative('../lib/jails.rb')
+Dir[File.join(__dir__, '..', 'app', 'controllers', '*.rb')].each {|file| require(file) }
+Dir[File.join(__dir__, '..', 'app', 'models', '*.rb')].each {|file| require(file) }
+</pre>
+<p>So now when our app is launched it will automatically require the routes.rb and lib/jails.rb files and all the files ending in .rb in the app/controllers and app/models directories. The lib/jails.rb file will hold our MVC framework code. We'll explain require, require_relative, Dir, and the File class's join method later in this section.</p>
+
+
+<p>Now make sure it works. Go to the terminal and from the blog directory run the server (<code>rackup</code>), refresh your browser (http://localhost:9292), and your browser should display a simple message that Rack Response Works. <!-- If not take it out on your neighbors at home or at work. Then when you've calmed down you can do some debugging to figure out what's wrong. --> We are done with the coding for this part.</p>
+
+<hr class="space">
+<h3>Require vs Require_relative vs Load</h3>
+<b>Ruby Docs:</b> <a href="http://ruby-doc.org/core-2.5.0/Kernel.html#method-i-require">ruby-doc.org/core-2.5.0/Kernel.html</a>
+<p>Require, require_relative, and load are methods in Ruby's Kernel module. <br>
+<b>require(<i>filename</i>)</b> loads the given file to memory as a source file if it is a Ruby file. Ruby files end with extension .rb, but if you leave off the extension it will assume <i>.rb</i>. If the file is already loaded to memory it will not reload it. It first searches the absolute path (from your computer's root directory). Entering the UNIX <i>present working directory</i> command <code>pwd</code> in the terminal will return that directory's absolute path. If it does not find a file by that name it then searches the directories in the Ruby $LOAD_PATH. It will load the first file with this name that it can find.<br>
+<b>require_relative(<i>filename</i>)</b> is like require but it searches for the file relative to the requiring file's path.<br>
+<b>load(<i>filename</i>)</b> is like require except it reloads the source file every time it is called, overriding any copy in memory. Also, you do not have the option of leaving out the .rb file extension like you do with require and require_relative. <br>
+Generally, use require for importing libraries and load for executing code. <br>
+Also note that order matters. A file has to be loaded to memory with require or load before you can access it's code. In the boot.rb file we had to require the routes file before the jails file because the latter will run a method from the former (we'll cover that in the next part). If you switch the order you'll get an error message. 
+</p>
+
+<hr class="space">
+<h3>$LOAD_PATH</h3>
+<p>$LOAD_PATH or it's shorter version $: is a special global variable where Ruby stores an array of directories to search from when using the <i>require</i> and <i>load</i> methods. In Ruby, global variables begin with <i>$</i> and are available anywhere in the program unlike local, instance, and class variables or constants. To see what paths are in $LOAD_PATH, from IRB enter: <code>$LOAD_PATH</code> or <code>$:</code> which will return an array of absolute paths. Ruby gems end up in the load path as we'll explain the part 7.</p>
+<p>While we are not doing this here, you can add a directory to the $LOAD_PATH. Since it's an array, the unshift method will add it to the beginning of the array and the push method to add it to the end. <!-- (shift and pop methods remove the first or last element from an array respectively) -->
+<code class="pre">$LOAD_PATH.push(<i>directory/path</i>)</code>
+<!-- <code class="pre">$LOAD_PATH.push(__dir__)</code> -->
+The shovel operator will also append a directory to the array.
+<code class="pre">$LOAD_PATH &lt;&lt; <i>directory/path</i></code>
+If you add a directory to the $LOAD_PATH you still need to use require, require_relative, or load to access a file in it.
+ </p>
+
+<hr class="space">
+<h3>File related methods</h3> 
+<b>Ruby Docs:</b> <a href="https://ruby-doc.org/core-2.5.0/File.html">ruby-doc.org/core-2.5.0/File.html</a> | <a href="http://ruby-doc.org/core-2.5.0/Dir.html">ruby-doc.org/core-2.5.0/Dir.html</a>
+<p>Two dots go up one directory. One dot means the current directory. <br>
+<code>File.join(__dir__, '..', 'app', 'models', 'article.rb')</code> returns "./../app/models/article.rb" <br>
+__dir__ is a Kernel method that returns the absolute path to the directory from the file it is called from. <br>
+<code>Dir[File.join(__dir__, '..', 'app', 'controllers', '*.rb')]</code> returns an array of file names with their path that match the provided arguments. <br>
+Dir is a Ruby class for working with directories. The Dir.glob(<i>pattern</i>) method returns an array of files including their paths per the pattern argument. A shortcut is just to use Dir[<i>pattern</i>].<br>
+<code>Dir[File.join(__dir__, '..', 'app', 'controllers', '*.rb')].each {|file| require(file) }</code> <br>
+Iterates over the provided block for each element in the array. So this will require every file in the app/controllers folder that ends in .rb. <br>
+</p>
+
+<hr class="space">
+<p>That concludes the file structure section. Next up... Routes.</p>
+
+<hr>
+<p><a href="build_rails_3">On to Part 3 - Routes</a></p>
+</div>
+</div>
+</body>
+</html>

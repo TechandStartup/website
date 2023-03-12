@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Build your own Ruby on Rails Tutorial</title>
+  <meta name="description" content="Learn Ruby and Rails by building your own simple web framework. Tutorial"> 
+  <meta name="keywords" content="Ruby on Rails, Web Framework Tutorial">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Models: Bonus Section <small style="padding-left: 25px;">Build Your Own Rails - Part 5b</small></h1>
+  <p>Learn Ruby and Rails by building your own very simplistic Rails-like Framework.</p>
+  <p><a href="build_rails_5">Back to Part 5</a> | <a href="build_rails_6">On to Part 6</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<!-- See jailsfolder3 pt5ar for active record. pt5s for Sequel, which only works for index and new/create actions. And pt5-n to modify our own Hacktive Record to use the same config/database.yml file. But I didn't confirm it works after separating it into a gem. -->
+<!-- Brief tutorial from Dec 2017 on using AR in a very simple Ruby app. Includes using AR migrations. https://www.techcareerbooster.com/blog/use-activerecord-in-your-ruby-project -->
+<p>The below is for added learning related to Models and Databases. None of these changes are incorporated in our final framework or app.</p>
+<h3>Use Active Record as your ORM</h3>
+<p>To use the Active Record gem for our ORM instead of Hacktive Record that we created you only need to make minor modifications.</p>
+
+<p>Add and install the activerecord gem.</p>
+<pre>
+<b># Gemfile</b>
+gem 'activerecord'
+</pre>
+<p><code>bundle install</code></p>
+
+<p>Add a database configuration file in YAML format. You can even use different databases like Postgres or MySQL since Active Record will be managing the adaptation for us. <br>
+<code>touch config/database.yml</code></p>
+<pre>
+<b># config/database.yml</b>
+adapter: sqlite3
+database: "db/development.sqlite3"
+</pre><br>
+
+<p>We don't need most of our model code, but we do need the model. And it now inherits from ActiveRecord::Base.</p>
+<pre>
+<b># app/models/article.rb</b>
+class Article < ActiveRecord::Base
+
+  # Return title when accessing object as string, overrides default: class, encoded object id and instance variables.
+  def to_s
+    title
+  end
+end
+</pre><br>
+
+<p>In our boot file we need to connect to our database through Active Record.</p>
+<pre>
+<b># config/boot.rb</b>
+require 'yaml'
+require 'active_record'
+
+require_relative('routes.rb')
+require_relative('../lib/jails.rb')
+Dir[File.join(__dir__, '..', 'app', 'controllers', '*.rb')].each {|file| require(file) }
+Dir[File.join(__dir__, '..', 'app', 'models', '*.rb')].each {|file| require(file) }
+
+def db_configuration
+  db_configuration_file = File.join(__dir__, 'database.yml')
+  YAML.load(File.read(db_configuration_file))
+end
+ 
+ActiveRecord::Base.establish_connection(db_configuration)
+</pre><br>
+<p>That's all the changes needed. Restart the server and refresh the app and it should work just like before. The HacktiveRecord class still exists but isn't being used.</p>
+
+<hr class='space'>
+<h3>Modify Hacktive Record to use the config/database.yml file</h3>
+<p>To be more modular and flexible we could make the database adapter and file location and name configurable as it is in Rails. Just make the below changes.</p>
+<p>Undo any changes you made above.</p>
+
+<code>touch config/database.yml</code>
+<pre>
+<b># config/database.yml</b>
+adapter: sqlite3
+database: "db/development.sqlite3"
+</pre>
+
+<pre>
+<b># lib/jails/hacktive_record.rb</b>
+<b>Change:</b>
+require "sqlite3"
+module HacktiveRecord
+  class Base
+    DB = SQLite3::Database.new("db/development.sqlite3")
+    ...
+<b>To:</b>
+require "yaml"
+require "sqlite3"
+module HacktiveRecord
+  class Base
+    # Return the database file path.
+    def self.db_configuration
+      db_configuration_file = File.join(__dir__, '../../config/database.yml')
+      YAML.load(File.read(db_configuration_file))["database"]
+    end
+    DB = SQLite3::Database.new(db_configuration)
+    ...
+</pre>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Build your own Ruby on Rails Tutorial</title>
+  <meta name="description" content="Learn Ruby and Rails by building your own simple web framework. Tutorial"> 
+  <meta name="keywords" content="Ruby on Rails, Web Framework Tutorial">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Controllers and Views <small style="padding-left: 25px;">Build Your Own Rails - Part 4</small></h1>
+  <p>Learn Ruby and Rails by building your own very simplistic Rails-like Framework.</p>
+  <p><a href="build_rails_3">Back to Part 3</a> | <a href="build_rails_5">On to Part 5</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<h2>Controllers</h2>
+<p>Controller is one of the MVC pillars. It takes the input and converts it to commands for the model or view. In a Web application the input would be a URL path that is routed to a controller class and method. A controller method that is aligned with a route is called an action. The action may call methods on the Model to query or modify data in a database. It may also call methods to display an HTML template, which in a Web app MVC structure would be the View.</p>
+
+<p>The Routing class's dispatch method called the controller with this statement: <code>klass.new(@request).send(action_name)</code>. <i>klass</i> is the variable we assigned to the controller class name. So if the request to path /about is routed to PagesController's about action, then the first part of that statement will instantiate a new instance of the PagesController class. We'll define the PagesController class in a minute but for now just know that it inherits from our Jails framework's Controller class. Let's define the first part of that now:</p>
+<pre>
+<b># lib/jails/controller.rb</b>
+class Controller
+  def initialize(request)
+    @request = request                       # 1
+    puts("\s Parameters #{@request.params}") # 2
+  end
+  ...
+end
+</pre>
+<p>When the PagesController object is instantiated, it receives the request object as its argument. <br>
+1) The first statement in the initialize method makes <i>request</i> a property of the object by assigning it to an instance variable <i>@request</i>. <br>
+2) We'll log the request params to print to the terminal for each request. These logs will be useful in understanding the flow of a request in our app. It's also useful for debugging if there's an error. If the log appears you know the program executed to at least that point. \s is backslash notation for a space so this log message will be indented. We need to use that because preceding white space like regular spaces are ignored. We could also use \t tab which adds much more space.</p>
+<p>Now we have a PagesController object. In the second part of the <code>klass.new(@request).send(action_name)</code> statement (from the Routing dispatch method), the send method is called. The reciever is the PagesController object. Send is an instance method of the Object class that allows you to call a method on the object by putting it as the argument. So in the example we are using, <i>about</i> is the action name (actions are methods that have a corresponding route "/about") that we are calling.</p>
+<p>Let's make some changes to our pages controller so we can start rendering real HTML pages. Change the PagesController class to inherit from the <i>Controller</i> class. Change some actions to set a @title instance variable. Finish each action by calling the render method. We'll define the render method in the Jails Controller class. It will display the HTML document (i.e., the view) for that action. Rails also has a render method but Rails will apply it by default if the action ends without either a render or redirect. So you don't see Rails controller actions ending with render, since it's applied as a default, but you can add it if you want. For our simple framework we won't give you that option. You need to include it.</p>
+<pre>
+<b># app/controllers/pages_controller.rb</b>
+class PagesController < Controller
+  # GET /
+  def home
+    render
+  end
+
+  # GET /about
+  def about
+    @title = "about"
+    render
+  end
+
+  # GET /pages/302
+  def show
+    redirect_to("/")
+  end
+
+  # GET /user
+  def user
+    @name = @request.cookies["name"]
+    render
+  end
+
+  # POST /jogin
+  def jogin
+    set_cookie("name", params["name"])
+  end
+
+  # GET /jogout
+  def jogout
+    delete_cookie("name")
+  end
+end
+</pre><br>
+
+<p>Now let's populate the whole Jails Controller class:</p>
+<pre>
+<b># lib/jails/controller.rb</b>
+class Controller
+
+  # Set request object as an attribute accessible with @request variable.
+  def initialize(request)
+    @request = request
+    puts("\s Parameters #{@request.params}")  
+  end
+
+  # helper method, params returns @request.params
+  def params
+    @request.params
+  end
+
+  # Return Rack response object with the erb template.
+  def render
+    resource = params[:resource]
+    action = params[:action]
+    template = "#{resource}/#{action}.html.erb"
+    file = File.join('app', 'views', template)
+    if File.exist?(file)
+      puts("\s Rendering #{template}") # Prints in log
+      render_template = ERB.new(File.read(file)).result(binding)
+      puts "\s Rendered #{template}"
+      response = Rack::Response.new([render_template], 200, {"Content-Type" => "text/html"})
+      puts "Completed 200 OK"
+      return response
+    else
+      puts("\s Missing Template #{template}.")
+      response = Rack::Response.new(["Nothing found"], 404, {"Content-Type" => "text/html"})
+      return response
+    end
+  end
+
+  # Return rendered partial template to be inserted into the parent template that called it.
+  def render_partial(template)
+    file = File.join('app', 'views', template)
+    if File.exists?(file)
+      rendered_partial = ERB.new(File.read(file)).result(binding)
+      puts "\s Rendered #{template}"
+      return rendered_partial
+    else
+      puts("\s Missing Template #{template}.")
+    end
+  end
+
+  # Return Rack response with header field Location assigned to path in argument.
+  def redirect_to(path)
+    response = Rack::Response.new([], 302, {"Location" => path})
+    return response
+  end
+
+  # Set cookie with parameter key:value, then redirect back.
+  def set_cookie(key, value)
+    Rack::Response.new do |response|
+      response.set_cookie(key, value)
+      response.redirect(@request.referer || @request.path)
+    end
+  end
+
+  # Delete cookie with parameter key and redirect back.
+  def delete_cookie(key)
+    Rack::Response.new do |response|  
+      response.delete_cookie(key)
+      response.redirect(@request.referer || @request.path)
+    end
+  end
+end
+</pre>
+<br>
+
+<p>We'll break this down method by method:</p><br>
+<pre>
+def params
+  @request.params
+end
+</pre>
+<p>Params is a helper method that lets us call <i>@request.params</i> with <i>params</i>. You can use either but the latter just looks cleaner.</p>
+<br>
+
+<pre>
+def render
+  resource = params[:resource]                                  # 1
+  action = params[:action]
+  template = "#{resource}/#{action}.html.erb"                   # 3
+  file = File.join('app', 'views', template)                    # 4
+  if File.exist?(file)                                          # 5
+    puts("\s Rendering #{template}") # Prints in log            # 6
+    render_template = ERB.new(File.read(file)).result(binding)  # 7
+    puts "\s Rendered #{template}"                              # 8
+    response = Rack::Response.new([render_template], 200, {"Content-Type" => "text/html"}) # 9
+    puts "Completed 200 OK"
+    return response
+  else                                                          # 12
+    puts("\s Missing Template #{template}.")
+    response = Rack::Response.new(["Nothing found"], 404, {"Content-Type" => "text/html"})
+    return response
+  end
+end
+</pre>
+<p><b>ERB:</b> Before we explain the render method let's briefly discuss ERB. eRuby (Embedded Ruby) is a templating system that embeds Ruby code into a text or HTML document. ERB is an implementation of eRuby that is part of the Ruby Standard Library. It lets you run Ruby code in your HTML document by putting it within &lt;%= <i>Ruby code here</i> %> tags if it returns a result to display, or &lt;% <i>Ruby code here</i> %> tags if it doesn't.</p>
+<p>Because ERB is part of Ruby's Standard Library, you don't need to add it as a gem. Rails uses a gem called erubi that is a superset of ERB that adds more functionality. We'll just use plain ERB. We'll talk more about ERB in the Views section.</p>
+
+<p><b>The render method</b> returns our ERB template or an error response if it can't be found.<br>
+1-2) The first two statements make use of the params helper method we just created. In the Routing class's dispatch method, the resource and action names were added to the @request.params hash. That was so we could access them now, so let's assign their values to local variables. <br>
+3) Assign a variable to the file name and path relative to the views directory. That is derived from the resource and action names separated by a forward slash, and appended with "html.erb." Thus the <i>pages</i> resource and <i>about</i> action would be transformed into the string <code>"pages/about.html.erb"</code>. ERB files must end in the .erb extension. Like Rails, we are also including .html in the extension, but it will work fine if the file name was excluded it: <i>about.erb</i>. <br>
+4) Now we'll get the full path to the template using the File join method, which puts / between each argument and returns it as a string. <br>
+5) The next clause is a conditional that checks if our file exists. <br>
+6) Print a log to the terminal that's running our server showing what template is being rendered. We're using the puts method to log what is happening in our code as it goes along. It's helpful in debugging since if it prints you know the code works up to that point. \s is backslash notation for a space to give our log message some indention.<br>
+7) Now we're going to load the actual template by instantiating a new object of the ERB class, passing in our template file as the argument. Chaining the <i>result</i> method to it will execute the ERB code and return the results. Passing in the Ruby <i>binding</i> object as the argument will give you access to instance variables declared in your controller action. <br>
+8) Log another message that the template has been rendered.
+9-11) Prepare the Rack response object saving it to a local variable, print a log message, then return the Rack response object.
+12) If there is no template to match the action then return a 404 Not Found error. This is similar to the 404 error we returned in the Routing class. But in this case the request did match a controller and action, and the action called the render method, but for some reason we don't have a template to match it. 
+</p><br>
+
+<pre>
+def render_partial(template)
+  file = File.join('app', 'views', template)   # 1
+  if File.exists?(file)                        # 2
+    rendered_partial = ERB.new(File.read(file)).result(binding)
+    puts "\s Rendered #{template}"
+    return rendered_partial
+  else                                         # 6
+    puts("\s Missing Template #{template}.")
+  end
+end
+</pre>
+<p>This method is called from within an erb template like this: <code>&lt;%= render_partial("layouts/_navbar.html.erb") %></code>. It takes the template file as its argument. It works much the same way as the render method except the file and its path from the view folder are given in the argument. <br>
+1) The first statement declares a local variable "file" and assigns it the file with it's path starting from the app directory (so from the app's root directory). <br>
+2-5) The <i>if</i> clause checks if the file exists. If so it creates an ERB object of the template with all the ERB code executed. Then prints a log message saying the template was rendered. Then returns the ERB object, which gets inserted into the parent template. <br>
+6-7) The else clause will log a "Missing Template" message on the terminal if there is no template file found. <br>
+Notice the render_partial does not return a Rack Response object like <i>render</i> does. That's because the partial gets embedded in the template that called it. As such it will just be part of the parent template's Rack Response object. 
+</p><br>
+
+<pre>
+def redirect_to(path)
+  response = Rack::Response.new([], 302, {"Location" => path})
+  return response
+end
+</pre>
+<p>Instead of rendering a template, some actions will perform some function then redirect the user either back to the page they were on before calling this action, or to a different page. So instead of ending an action with render, we would end it with redirect_to. This method returns a Rack response with no body and status code 302 indicating a temporary URL redirect. The headers set the "Location" field to the path sent in the argument. In our PagesController, the show action has a redirect to the home page <code>redirect_to("/")</code></p><br>
+
+<pre>
+def set_new_cookie(key, value)
+  Rack::Response.new do |response|
+    response.set_cookie(key, value)
+    response.redirect(@request.referer || @request.path)
+  end
+end
+</pre>
+<p>Instantiates a new Rack Response object and gives it a block. The first statement in the block uses the Rack Response helper method <i>set_cookie</i> to, well, set a cookie. Cookies are key value pairs so both need to be passed in as arguments. The second statement in the block is another Rack::Response helper method that redirects back to the request referer, or if there is none, then to the current request path. The request referer is the last url request the client user made before the current one. This is how back buttons know where to go.</p><br>
+
+<pre>
+def delete_the_cookie(key)
+  Rack::Response.new do |response|  
+    response.delete_cookie(key)
+    response.redirect(@request.referer || @request.path)
+  end
+end
+</pre>
+<p>Instantiates a new Rack Response object and gives it a block. The first statement in the block uses the Rack::Response delete_cookie method to clear the cookie with the key name passed in the argument. Then redirects back.</p>
+
+<hr class="space">
+<h2>Views</h2>
+<p>View is the V in MVC. It can be any output presentation of information. For a web application the view is the presentation of the HTML/ERB templates (or JSON or or XML or whatever format the output is in). We already created some template files in the File Stucture section. We put our template files in a "view" directory, with a subdirectory for each controller. And we have a layouts directory for our partial templates that will be used across all our views.
+</p>
+
+<b>ERB Tag Reference:</b>
+<ul>
+  <li><code>&lt;%= <i>Ruby code here</i> %></code> if it returns a result to display</li>
+  <li><code>&lt;% <i>Ruby code here</i> %></code> if it executes Ruby code but does not display a result.</li>
+  <li><code>&lt;%#= <i>Ruby code here</i> %></code> or <code>&lt;%# <i>Ruby code here</i> %></code> to comment out ERB. It won't run the code or be displayed.</li>
+</ul><br>
+
+<p>Our views directory looks like this:</p>
+<pre>
+app/views/layouts
+         /layouts/_head.html.erb
+         /layouts/_navbar.html.erb
+app/views/pages
+         /pages/home.html.erb
+         /pages/about.html.erb
+         /pages/user.html.erb
+</pre><br>
+
+<p>Since we have a pages controller that will render views, we have a corresponding pages folder in the app/views directory to hold our erb templates. Start with the home and about pages.</p>
+<pre>
+<b># app/views/pages/home.html.erb</b>
+&lt;!DOCTYPE html>
+&lt;html>
+  &lt;%= render_partial("layouts/_head.html.erb") %>
+  &lt;body>
+    &lt;div id="container">
+      &lt;%= render_partial("layouts/_navbar.html.erb") %>
+      &lt;h1>Blog App Home Page&lt;/h1>
+      &lt;hr>
+      &lt;p>Lorem Ipsum&lt;/p>
+    &lt;/div>
+  &lt;/body>
+&lt;/html>
+</pre>
+<pre>
+<b># app/views/pages/about.html.erb</b>
+&lt;!DOCTYPE html>
+&lt;html>
+  &lt;%= render_partial("layouts/_head.html.erb") %>
+  &lt;body>
+    &lt;div id="container">
+      &lt;%= render_partial("layouts/_navbar.html.erb") %>
+      &lt;h1>&lt;%= @title %>&lt;/h1>
+      &lt;hr>
+      &lt;p>Lorem Ipsum&lt;/p>
+      &lt;p>Link path to pages resource with an id parameter &lt;a href="/pages/301">pages/301&lt;/a> will redirect to the home page.&lt;/p>
+    &lt;/div>
+  &lt;/body>
+&lt;/html>
+</pre>
+<p>In the <i>about</i> controller action we declared a @title instance variable. We are using it to display the page title in our templates, which is converted to the @title value by ERB.</p>
+
+<p>Also notice our ERB code calls the render_partial method passing in the partial template path relative to the <i>view</i> folder. Partial template file names begin with an underscore just so we can see at a glance that it's a partial, but a file name without the underscore would work just the same. If you want to test just the render method to see if it works, that's a good time to use the ERB comment tag to just comment it out: <code>&lt;%#= render_partial("layouts/_navbar.html.erb") %></code> so the method isn't called. Then uncomment it when you want to use it again.</p>
+<br>
+
+<p>The render_partial methods allow us to put html used across multiple templates in their own file. We will create one for the head section and one for the navbar and put them in the app/views/layouts directory. Rails does one better by allowing you to create a base template for use by all your other ERB files. But we're keeping it simple.</p>
+<pre>
+<b># app/views/layouts/_head.html.erb</b>
+&lt;head>
+  &lt;title>&lt;%= @title || "BlogApp" %>&lt;/title>
+  &lt;link rel="stylesheet" href="/stylesheets/application.css" type="text/css" charset="utf-8">
+&lt;/head>
+</pre>
+<p>The title element is the short text displayed in your browser tab. The @title instance variable allows us to assign a value in the controller, or it will default to BlogApp or whatever we want the default to be.</p>
+<p>Way back when we first populated the config.ru file, we used Rack middleware to serve static files from the app/assets directory. 
+  <code class="pre">use(Rack::Static, :urls => ["/stylesheets", "/javascripts", "/images"], :root => "app/assets")</code>
+  We are using that functionality in our stylesheet link. When we created our files, we created app/assets/stylesheets/application.css. This is not a CSS tutorial so feel free put your own CSS styling there or use the simple CSS provided at the end of this section. 
+</p><br>
+
+<p>A navbar is a good candidate for a layout partial.</p>
+<pre>
+<b># app/views/layouts/_navbar.html.erb</b>
+&lt;nav id="navbar">
+  &lt;a class="active" href="/">Home&lt;/a>
+  &lt;a href="/articles">Articles&lt;/a>
+  &lt;a href="/user">User&lt;/a>
+  &lt;a href="/about">About&lt;/a>
+&lt;/nav>
+</pre>
+
+<br>
+<p>The user template has a simple form to jog in or jog out, not to be confused with logging in and logging out which requires some kind of security. Our app just asks for your name and stores it in plain text in an unencrypted cookie. We'll use ERB to make a conditional that displays the user's name along with a jog out link to the /jogout path if there is a cookie with the key of "name." If not then it presents a form that will submit to the /jogin path.</p>
+<pre>
+<b># app/views/pages/user.html.erb</b>
+&lt;!DOCTYPE html>
+&lt;html>
+  &lt;%= render_partial("layouts/_head.html.erb") %>
+  &lt;body>
+    &lt;div id="container">
+      &lt;%= render_partial("layouts/_navbar.html.erb") %>
+      &lt;h1>&lt;%= @title %>&lt;/h1>
+      &lt;hr>
+      &lt;% if @name %>
+        &lt;h1>Hello &lt;%= @name %>&lt;/h1>
+        &lt;p>&lt;a href="/jogout">Jog Out&lt;/a>&lt;/p>
+      &lt;% else %>
+        &lt;h1>Jog In Please&lt;/h1>
+        &lt;form action="/jogin" method="POST">
+          &lt;div>
+            &lt;label for="name">Name&lt;/label>&lt;br>
+            &lt;input name="name" type="text">
+          &lt;/div>
+          &lt;input type="submit" value="JogIn">
+        &lt;/form>
+      &lt;% end %> 
+      &lt;%= @name %>
+    &lt;/div>
+  &lt;/body>
+&lt;/html>
+</pre>
+
+<hr class="space">
+<h3>CSS</h3>
+<p>Add some basic styling.</p>
+<pre>
+<b># app/assets/stylesheets/application.css</b>
+body {
+  background-color: #99ccff;
+  font-family: Verdana;
+  font-size: 14px;
+  margin:0;
+}
+#container {
+  width: 75%;
+  margin: 0 auto;
+  background-color: #FFF;
+  padding: 20px 40px;
+  border: solid 1px black;
+  margin-top: 20px;
+}
+a { color: #0000FF; }
+
+#navbar {
+  overflow: hidden;
+  background-color: #404040;
+}
+
+#navbar a {
+  float: left;
+  color: #f2f2f2;
+  text-align: center;
+  padding: 14px 16px;
+  text-decoration: none;
+  font-size: 17px;
+}
+
+#navbar a:hover {
+  background-color: #cce6ff;
+  color: black;
+}
+
+#navbar a.active {
+  background-color: #004d99;
+  color: white;
+}
+</pre>
+
+<hr class="space">
+<p>Restart the server (control+C to stop, <code>rackup</code> to start) and go to localhost:9292 to test it out. Go through the links. On the User page you can submit your name in the form and it will be added as an unencrypted cookie. The about page has a link to pages#show with an id (we're using 302 just to make the point, but it can be any number). Our controller action for show is a redirect back to the home page. The Articles link goes nowhere since we haven't created the Article resource yet. We'll do that next.</p>
+<hr>
+<p><a href="build_rails_5">On to Part 5 - Models and Database</a></p>
+</div>
+</div>
+</body>
+</html>

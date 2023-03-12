@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Build your own Ruby on Rails Tutorial</title>
+  <meta name="description" content="Learn Ruby and Rails by building your own simple web framework. Tutorial"> 
+  <meta name="keywords" content="Ruby on Rails, Web Framework Tutorial">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Support Module <small style="padding-left: 25px;">Build Your Own Rails - Part 6</small></h1>
+  <p>Learn Ruby and Rails by building your own very simplistic Rails-like Framework.</p>
+   <p><a href="build_rails_5">Back to Part 5</a> | <a href="build_rails_7">On to Part 7</a><br>
+    Finished Code for the entire project: <a href="https://github.com/steve981cr/jailsfolder">github.com/steve981cr/jailsfolder</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<p>Our Jails library includes the file lib/jails/support.rb which so far is empty. Rails is composed of 10 different gems packaged together as one. Among those gems is ActiveSupport. Rails puts multiple libraries in there for things like working with time zones, internationalization, testing, and string helper methods. We'll use our support module to put helper methods for strings that can be used directly within our framework, or in apps that use our framework.</p>
+<p>We have already been using modules as a namespace to contain our Jails framework classes and our Blog application classes. Another use for Modules is to hold mix-in methods. Mix-ins are useful methods that can be plugged into different classes and used as if they were defined in that class. You just have to add <code>include(<i>ModuleName</i>)</code> just after the class definition to include the mix-ins as instance methods. Add <code>extend(<i>ModuleName</i>)</code> to use the mix-ins as class methods.</p>
+
+<hr class="space">
+<h3>Titleize</h3>
+<p>We have an Article resource that includes a <i>title</i> attribute. Let's define a helper method that will automatically put the title string into a title format. That's where each word in the title is capitalized, except for short words that are articles, conjunctions, and prepositions. The first word of the title is always capitalized.</p>
+<pre>
+<b># lib/jails/support.rb</b>
+module Support
+  # Transform string, downcase all words, capitalize each not on list, capitalize first word. 
+  def titleize(string)
+    do_not_capitalize = ["the","a","an","and","but","or","nor","for","of","to","at","by","from","in","on"] 
+    array = string.split.each do |word| 
+      if do_not_capitalize.include?(word.downcase)
+        word.downcase!
+      else
+        word.capitalize! 
+      end
+    end
+    array[0].capitalize + " " + array[1..-1].join(" ")
+  end
+end
+</pre>
+<p>To have access to this method in our controller and views we need to include the Support module in the Controller class. Use <i>include</i> since we will be applying this method to instances of the Article class.</p>
+<pre>
+<b># lib/jails/controller.rb</b>
+class Controller
+  include(Support)
+  ...
+</pre>
+<p>Now let's use this helper method in our Blog app. First create a new article with a title that has some messed up capitalization like <i>a lesson oN The BASICS</i>. That looks pretty ugly huh. How do we change that? Remember that titleize helper method we just created? We could either use it in the Create and Update actions to change it to title case before it is saved in the database. Or we could save it however they wrote it and just change the display. Let's do that latter since there are some valid reasons to have a word in all caps, like HTML, HTTP, etc. But we won't worry about that. Just make the following changes in the index and show pages:</p>
+<pre>
+<b># app/views/articles/index.html.erb</b>
+Change: &lt;%= article.title %>
+To: &lt;%= titleize(article.title) %>
+<b># app/views/articles/show.html.erb</b>
+Change: &lt;%= @article.title %>
+To: &lt;%= titleize(@article.title) %>
+</pre>
+<p>Restart the server and in the browser go to the /articles page and there you have a properly titleized title. Click on it and you'll see it properly titleized in the show page too.</p>
+
+<hr class="space">
+<h3>Pluralize</h3>
+<p>Let's do another one. On our articles index page we list the number of articles at the top, like <i>3 Articles</i>. But if there is only one article we don't want it to say <i>1 Articles</i>. So let's create a pluralize method and put it in our Support module.</p>
+<pre>
+<b># lib/jails/support.rb</b>
+module Support
+  ...
+  # Return count and word properly pluralized.
+  def pluralize(count, singular, plural)
+    if count == 1
+      count.to_s + " " + singular
+    else
+      count.to_s + " " + plural
+    end
+  end
+end
+</pre>
+<p>This will take three arguments. The count, the singular version of the string and the plural version. Rails has a similar method that just takes the singular version and can pluralize it even if it's an irregular pluralization. We won't be so fancy. So now in our index page change <code>&lt;%= @articles.size %> Articles |</code> to:</p>
+<pre>
+<b># app/views/articles/index.html.erb</b>
+...
+&lt;%= pluralize(@articles.size, "Article", "Articles") %> |
+...
+</pre>
+<p>We already included the Support module in the Controller class we so have access to this method. If you refresh the browser it should work. If you deleted articles until there was 1, it should then be singular.</p>
+<p>The size method returns the number of records in memory. You could also do a database pull to get that result since we created a class method in HacktiveRecord::Base to do that. Instead of calling the size method on the @articles instance variable you could call the count method on the Article class.</p>
+<pre>
+<b># app/views/articles/index.html.erb</b>
+...
+&lt;%= pluralize(Article.count, "Article", "Articles") %> |
+...
+</pre>
+<p>The result will be the same, but if you look in the terminal at the logs you'll see that there was an additional query to the database to get the count.</p>
+
+<hr class="space">
+<h3>Colorize Logs</h3>
+<p>The mix-in methods we define in our Support file can apply to our Jails framework or an app that uses our Jails framework like our Blog app, or both. We are using titleize and pluralize as helper methods for our apps. Let's define a helper method that we'll use in our Jails framework.</p>
+<p>Our HacktiveRecord module logs our SQL statements to the terminal using puts. It would be nice to colorize these so the output is not so bland. Then when we see the colored output we'll know these are SQL statements. We could apply the code to colorize the output directly to the puts statements. But let's make a helper method to do that instead. </p>
+<pre>
+<b># lib/jails/support.rb</b>
+module Support
+  ...
+  # Colorize UNIX output - blue
+  def blue(string) 
+    "\e[34m#{string}\e[0m"
+  end
+end
+</pre>
+<p>We define in the Support module a method named <i>blue</i> that takes a string as the argument. Then apply a UNIX wrapper to it to change the color of the output in a UNIX terminal to blue. So just like we inserted SQL code as a string to execute database queries, we're wrapping UNIX code as a string to the display on a UNIX terminal.</p>
+<p>Now in our HacktiveRecord::Base class we can extend the Support module to get access to class methods. Put the <i>extend</i> method just after the Base class definition. As mentioned above, to use mix-ins as class methods you use <i>extend</i> and to use them as instance methods you use <i>include</i>. Modify the <i>all</i> method's puts by inserting our <i>blue</i> method.</p>
+<pre>
+<b># lib/jails/hacktive_record.rb</b>
+module HacktiveRecord
+  class Base
+    <b>extend(Support)</b>
+    ...
+    def self.all
+      ...
+      puts(<b>blue(</b>"\s #{self} SQL Statement: SELECT * FROM #{table}"<b>)</b>)
+      ...
+    end
+    ...
+  end
+end
+</pre>
+<p>You shouldn't have to restart your server. Just click on the articles page, then look at the logs. You should see that the SQL statement is now printed in blue. But there's a minor problem. Our HacktiveRecord methods that perform our SQL statements that we are logging include both class and instance methods. <i>All</i> and <i>find</i> are class methods (begin with self), while save, update, and destroy are instance methods. So we could add <code>include(Support)</code> just below <code>extend(Support)</code> to be able to use it with both. But really what we are doing is modifying instances of the string class. So another option would be just to define new methods of the Ruby String class. Ruby allows us to do this. Just add our own String class in the support.rb file below the support module. We'll add methods that change the color of UNIX output to blue, cyan (a blue-green color), green, brown, and red, and we'll also add one to make the text bold.</p>
+<pre>
+<b># lib/jails/support.rb</b>
+module Support
+  ...
+end
+
+class String
+  # colorize UNIX output cyan 
+  def cyan
+    "\e[36m#{self}\e[0m" 
+  end
+
+  # colorize UNIX output blue
+  def blue
+    "\e[34m#{self}\e[0m" 
+  end 
+
+  # colorize UNIX output green
+  def green
+    "\e[32m#{self}\e[0m" 
+  end
+  
+  # colorize UNIX output brown
+  def brown
+    "\e[33m#{self}\e[0m" 
+  end
+
+  # colorize UNIX output red
+  def red
+    "\e[31m#{self}\e[0m" 
+  end
+
+  # bold UNIX output
+  def bold
+    "\e[1m#{self}\e[22m" 
+  end 
+end
+</pre><br>
+
+<p>Now we can chain these methods to strings. Back in hacktive_record.rb, change the puts methods to the below. And we no longer need the <code>extend(Support)</code> method at the top.</p>
+<pre>
+<b># lib/jails/hacktive_record.rb</b>
+module HacktiveRecord
+  ...
+    def self.count
+      ...
+      puts("\s #{self} SQL Statement: ".cyan.bold + "SELECT COUNT(*) FROM #{table}".blue.bold)
+      ...
+    end
+    def self.all
+      ...
+      puts("\s #{self} SQL Statement: ".cyan.bold + "SELECT * FROM #{table}".blue.bold)
+      ...
+    end
+    def self.find(id)
+      ...
+      puts("\s #{self} SQL Statement: ".cyan.bold + "SELECT * FROM #{table} WHERE id = #{id} LIMIT 1".blue.bold)
+      ...
+    end
+    def save
+      ...
+      puts("\s #{self.class} SQL Statement: ".cyan.bold + "INSERT INTO #{self.class.table} (#{columns}) VALUES (#{placeholders})".green.bold + values.to_s)
+      ...
+    end
+    def update(attributes={})
+      ...
+      puts("\s #{self.class} SQL Statement: ".cyan.bold + "UPDATE #{self.class.table} SET #{columns} WHERE id = ?".brown.bold + values.to_s)
+    end
+    def destroy
+      ...
+      puts("\s #{self.class} SQL Statement: ".cyan.bold + "DELETE FROM #{self.class.table} WHERE id = #{id}".red.bold)
+    end
+end
+</pre>
+
+<p>And let's add some styling to our error messages. We'll print the error class in bold red, and make the line that introduces the backtrace bold.</p>
+<pre>
+<b># lib/jails/routing.rb</b>
+class Routing
+  ...
+  def dispatch
+  ...
+  rescue StandardError => error
+    puts("-"*100)
+    puts("#{error.class.name<b>.red.bold</b>}: #{error.message}")
+    puts("Exception source stack displays filename, line number, and method the exception is in:"<b>.bold</b>)
+    puts(error.backtrace)
+    puts("-"*100)
+    Rack::Response.new(["Internal error"], 500, {"Content-Type" => "text/html"})
+  end
+end
+</pre>
+
+<p>Now if you go back to your browser and perform CRUD operations on your articles resource you should see the logs print the SQL statements in color. And if you purposely put a typo in your code you'll see a red bold error class. You gotta admit. That's pretty cool... Admit it.</p>
+
+<p>We'll stop there, but of course the number of mix-ins you could define is almost limitless. That's a good area to practice defining your own. Well our Blog application is now done. In the next part we'll extract the Jails library out of our single Blog app and package it as a separate gem. It will work the same, but as a gem it can be applied to any Ruby app using the same structure, by adding it to the app's Gemfile.</p>
+<hr>
+<p><a href="build_rails_7">On to Part 7 - Make it a Gem</a></p>
+</div>
+</div>
+</body>
+</html>

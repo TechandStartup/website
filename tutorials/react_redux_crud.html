@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Redux CRUD Tutorial</title>
+  <meta name="description" content="Tutorial on how to use React with Redux for CRUD transactions with a Rails or other API."> 
+  <meta name="keywords" content="Redux CRUD, Redux CRUD tutorial, React with Redux">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Redux CRUD App Tutorial</h1>
+  <p>Create a React with Redux and React Router application using a Ruby on Rails API.</p>
+  <p>By Steve Carey - Last updated 7/3/2019</p>
+  This Tutorial covers:
+  <ul>
+    <li><a href="#api-only">Create a Rails API</a></li>
+    <li><a href="#react-redux">Create a React with Redux front end application</a></li>
+  </ul>
+  <p>Finished code: <a href="https://github.com/steve981cr/redux-crud-app">Github</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<h2>Introduction</h2>
+<p>In this tutorial we will create a React with Redux and React Router application that interacts with a database to do Create-Read-Update-Delete (CRUD) transactions through an API. That sounds like a lot. And it is. But we'll try to make it as straightforward as possible. We'll use a Ruby on Rails API-only application for our backend, although you can build your own with another framework if you prefer.</p>
+<p>This tutorial assumes you are familiar with React, JavaScript ES6 syntax, and the concepts involved with API calls/asynchronous HTTP requests. It assumes only limited knowledge of Redux. You may find the  <a href="react_redux_apis">World's Simplest Redux with APIs Example</a> to be a good introduction.</p>
+
+<hr class="space">
+<h3 id="api-only">Build an API Back End</h3>
+<p>For a CRUD application we need to build an API on the server to interact with the database. This tutorial's main focus is on the React and Redux front end. So you can use any framework you like for building the back end. You just need an endpoint at localhost:3001/articles to receive GET requests for all articles and POST requests to create new ones. And an endpoint at localhost:3001/articles/:id to receive GET, PATCH and DELETE requests for specific articles. And a database table called "articles" with fields for id, title, and content. </p>
+<p>If you have a Ruby on Rails environment set up on your computer, we have a whole separate <a href="rails_api">Rails API Tutorial</a>. If you are already familiar with Rails, we'll quickly create an API that meets our requirements right now. Here are the steps starting from your Terminal:</p>
+<li>Generate a new Rails API-only application:</li>
+<li class="dlr"><code>mkdir articles-api; cd articles-api</code></li> 
+<li>If you are using RVM for Ruby and Gems version control you can set your gemset at this point.</li>
+<li class="dlr"><code>rails new . --api</code></li>
+<li>Generate an Articles scaffold which will create your database table, model, controller, and routes:</li>
+<li class="dlr"><code>rails generate scaffold Article title:string content:text</code></li>
+<li class="dlr"><code>rails db:migrate</code></li>
+<li>Change the index action in the Articles controller to order them most recent first:</li>
+<pre>
+# app/controllers/articles_controller.rb 
+...
+def index
+  @articles = Article.all.order(created_at: :desc)
+  render json: @articles
+end
+</pre>
+<li>Add some seed data. Something like the below:</li>
+<pre>
+# db/seed.rb
+Article.create(title: "Learn React", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.")
+Article.create(title: "Learn APIs", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.")
+Article.create(title: "Learn Redux", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.")
+</pre>
+<li class="dlr"><code>rails db:seed</code></li>
+<li>Add and configure the rack-cors gem to allow access from your React app.</li>
+<pre>
+# Gemfile
+gem 'rack-cors', require: 'rack/cors'
+</pre>
+<li class="dlr"><code>bundle install</code></li>
+<pre>
+# config/initializers/cors.rb
+Rails.application.config.middleware.insert_before 0, Rack::Cors do
+  allow do
+    origins '*'
+    resource '*',
+      headers: :any,
+      methods: [:get, :post, :put, :patch, :delete, :options, :head]
+  end
+end
+</pre>
+
+<p class='mt-3 mb-1'>Add an "api" namespace to the routes. This will avoid potential route collisions between your back-end api and your front-end react routes.</p>
+<pre>
+# config/routes.rb
+scope '/api' do
+  resources :articles
+end
+</pre>
+
+<li>Run the server and test it out.</li>
+<li class="dlr"><code>rails server -p 3001</code></li>
+<li>View the JSON data at http://localhost:3001/api/articles.json</li>
+<p>Your API is ready to go.</p>
+
+<hr class="space">
+<h2 id='react-redux'>Set up a React app with Redux</h2>
+<p>Use Create React App to set up a React app.</p>
+<li class="dlr"><code>create-react-app redux-crud-app</code></li>
+<p class="dlr"><code>cd redux-crud-app</code></p>
+Packages:
+<ul>
+  <li><b>Redux</b>: Creates a centralized object to store and access you application's current state. Docs: <a href="https://redux.js.org/basics">redux.js.org/basics</a></li>
+  <li><b>React-Redux</b>: Connects React Components with Redux store. Docs <a href="https://github.com/reduxjs/react-redux/blob/master/docs/api.md#api">github.com react-redux</a></li>
+  <li><b>Redux-Thunk</b>: Middleware that allows you to create asynchronous Redux actions that can wait for an API response. Docs: <a href="https://github.com/reduxjs/redux-thunk">github.com redux-thunk</a></li>
+  <li><b>Redux-Logger</b>: Creates a log in the console every time an action is called. Docs: <a href="https://www.npmjs.com/package/redux-logger">npmjs.com/package/redux-logger</a></li>
+  <li><b>react-router-dom</b>: Adds routes to your React app. Docs: <a href="https://reacttraining.com/react-router/web/guides/philosophy">reacttraining.com/react-router/web/guides</a></li>
+  <li><b>Axios</b>: Facilitates making API calls using AJAX. Docs: <a href="https://www.npmjs.com/package/axios">npmjs.com/package/axios</a></li>
+</ul>
+<p>Install your packages:</p>
+<li class="dlr"><code>npm install --save redux react-redux redux-thunk redux-logger react-router-dom axios</code> </li>
+or 
+<p class="dlr"><code>yarn add redux react-redux redux-thunk redux-logger react-router-dom axios</code></p>
+<p>Run the server to make sure it's working:</p>
+<p class="dlr"><code>npm start</code> or <code>yarn start</code></p>
+<p>You should see the default Welcome to React app in your browser.</p>
+
+<hr class="space">
+<h4>Set up the File Structure</h4>
+<p>Use the below Unix commands to create directories and remove, move, and create files.</p>
+<pre>
+rm src/logo.svg
+rm src/App.test.js
+rm src/registerServiceWorker.js
+touch src/history.js
+mkdir src/stylesheets
+mv src/index.css src/stylesheets/index.css
+mv src/App.css src/stylesheets/App.css
+mkdir src/components
+mv src/App.js src/components/App.jsx
+touch src/components/ArticleList.jsx
+touch src/components/ArticleInfo.jsx
+touch src/components/ArticleAdd.jsx
+touch src/components/ArticleEdit.jsx
+mkdir src/actions
+touch src/actions/index.js
+mkdir src/reducers
+touch src/reducers/index.js
+touch src/reducers/articlesReducer.js
+touch src/reducers/articleReducer.js
+</pre>
+<p>We'll cover these as we build the app but just as a high level overview, Redux uses actions and reducers. Our app is just big enough to warrant separate folders for each. And each has an index.js file which is automatically called by Redux when you reference the folder.</p>
+<p>The components folder holds our React components. Redux recommends splitting all your React components into Presentational Components, which hold the JSX, and Container components, which interact with Redux. We're not going to do that because our component files will be pretty slim as it is, and it's easier to understand the flow of the code if we don't. In a real-world app with lots of stuff in each component it would make sense to split them that way.</p>
+<p>For convenience we'll use the Bootstrap CDN for our styling. Import it at the top of the index.css file.</p>
+<pre>
+// <b>src/stylesheets/index.css</b>
+
+@import url('https://stackpath.bootstrapcdn.com/bootstrap/4.1.2/css/bootstrap.min.css');
+</pre>
+<p>Our app is broken now but we'll get it working again shortly.</p>
+
+<hr class="space">
+<h4>Set up Redux</h4>
+<p>First we'll set up the main index.js file for our React with Redux app.</p>
+<pre>
+// <b>src/index.js</b>
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import { createStore, applyMiddleware } from 'redux';
+import thunk from 'redux-thunk';
+import logger from 'redux-logger'
+import { Provider } from 'react-redux';
+import './stylesheets/index.css';
+import App from './components/App';
+import rootReducer from './reducers';
+
+const store = createStore(rootReducer, applyMiddleware(thunk, logger));  <span>#1</span>
+
+ReactDOM.render(
+  &lt;Provider store={store}>                                               <span>#2</span>
+    &lt;App />
+  &lt;/Provider>, 
+  document.getElementById('root')
+);
+</pre>
+<ol>
+  <li>In addition to the standard React setup, we are setting up our Redux store with the createStore method. It takes our root reducer as the first argument, imported from the src/reducers/index.js file. And we will be applying the Thunk middleware package for our asynchronous API calls, and Logger for logging our actions in the Console to help with development.</li>
+  <li>The Redux-React package enables Redux to interact with React. Wrapping our main App element in Redux-React's Provider component with a store attribute makes the Redux store available to all our React components.</li>
+</ol>
+
+<p>The first argument in createStore() is the reducer. Our app will have two reducer functions, one for an array of articles, and one for a specific article. When you have more than one reducer you need to combine them into a single reducer object using Redux's combineReducers method. We can set that up now in the reducers index file even though we haven't defined the reducers yet.</p>
+<pre>
+<span>// src/reducers/index.js</span>
+
+import { combineReducers } from 'redux';
+import articles from './articlesReducer';
+import article from './articleReducer';
+
+export default combineReducers({
+  articles: articles,
+  article: article,
+});
+</pre>
+
+<hr class="space">
+<h4>Set up React Router</h4>
+<p>React Router is the most popular Routing package for React. It can work independently of Redux. Quoting from <a href="https://redux.js.org/advanced/usagewithreactrouter">Redux docs</a>:<br> 
+"Redux will be the source of truth for your data and React Router will be the source of truth for your URL. In most of the cases, it is fine to have them separate unless you need to time travel and rewind actions that trigger a URL change."</p>
+<p>Our navigation will be contained in the App component. We will set up a nav bar with two menu items, articles and new article, and add all our routes up front.</p>
+<pre>
+// <b>src/components/App.jsx</b>
+
+import React, { Component } from 'react';
+import ArticleAdd from './ArticleAdd';
+import ArticleList from './ArticleList';
+import ArticleInfo from './ArticleInfo';
+import ArticleEdit from './ArticleEdit';
+import {Router, Route, NavLink, Switch} from 'react-router-dom'
+import history from '../history';
+
+class App extends Component {
+  render() {
+    return (
+      &lt;Router history={history}>
+        &lt;div className="container">
+          &lt;Navigation />
+          &lt;Main />
+        &lt;/div>
+      &lt;/Router>
+    );
+  }
+}
+
+const Navigation = () => (
+  &lt;nav className="navbar navbar-expand-lg navbar-dark bg-dark">
+    &lt;ul className="navbar-nav mr-auto">
+      &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/articles">Articles&lt;/NavLink>&lt;/li>
+      &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/articles/new">Add Article&lt;/NavLink>&lt;/li>
+    &lt;/ul>
+  &lt;/nav>
+);
+
+const Main = () => (
+  &lt;Switch>
+    &lt;Route exact path="/" component={ArticleList} />
+    &lt;Route exact path="/articles" component={ArticleList} />
+    &lt;Route exact path="/articles/new" component={ArticleAdd} />
+    &lt;Route exact path="/articles/:id" component={ArticleInfo} />
+    &lt;Route exact path="/articles/:id/edit" component={ArticleEdit} />
+  &lt;/Switch>
+);
+
+export default App;
+</pre>
+<p>We won't cover how React Router works in this tutorial. The docs are at <a href="https://reacttraining.com/react-router/core/guides/philosophy">reacttraining.com/react-router/core/guides</a>.</p> 
+<p>There is one thing different than a React without Redux app. We are importing from a file called "history" and adding it as an attribute to the Router element: <code>&lt;Router history={history}></code>. This is because we will be using functions outside of our components to interact with Redux. Per  <a href="https://github.com/ReactTraining/react-router/blob/master/FAQ.md#how-do-i-access-the-history-object-outside-of-components">React-Router's docs</a><!--  and this <a href="https://stackoverflow.com/questions/42701129/how-to-push-to-history-in-react-router-v4">Stack Overflow answer</a> -->, this requires accessing React's build-in history module. Populate the history file with these two lines:</p>
+<pre>
+// <b>src/history.js</b>
+
+import { createBrowserHistory } from 'history';
+
+export default createBrowserHistory();
+</pre>
+
+<p>To test if our initial Redux app and router are working let's add placeholder components to our component files.</p>
+<pre>
+// <b>src/components/ArticleList.jsx</b>
+
+import React from 'react';
+export default function Placeholder() {
+  return (&lt;h1>Articles Page&lt;/h1>);
+}
+</pre>
+<pre>
+// <b>src/components/ArticleAdd.jsx</b>
+
+import React from 'react';
+export default function Placeholder() {
+  return (&lt;h1>Add Article&lt;/h1>);
+}
+</pre>
+<pre>
+// <b>src/components/ArticleInfo.jsx</b>
+
+import React from 'react';
+export default function Placeholder() {
+  return (&lt;h1>Article Info&lt;/h1>);
+}
+</pre>
+<pre>
+// <b>src/components/ArticleEdit.jsx</b>
+
+import React from 'react';
+export default function Placeholder() {
+  return (&lt;h1>Edit Article&lt;/h1>);
+}
+</pre>
+
+<p>Restart the server: <code>npm start</code> or <code>yarn start</code></p>
+
+<p>Now when you go to localhost:3000 you should see a navbar with two working routes. Our routes are working! Now it's time to create our first API call.</p>
+
+<hr class="space">
+<h4>Get Articles - Connect the ArticleList Component</h4>
+<p>Let's make our first API call and update our User Interface with our first Action. From an HTTP request perspective, this is a GET request. From a database CRUD perspective this is a Read command.</p>
+<p>Let's initially populate our app with a list of articles pulled from the database and served by the API. Since we set up a Redux store object to be our single source of truth, and since the ArticleList page is our root route, let's add two lines to our initial src/index.js file:</p>
+<pre>
+// <b>src/index.js</b>
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+import { createStore, applyMiddleware } from 'redux';
+import thunk from 'redux-thunk';
+import logger from 'redux-logger'
+import { Provider } from 'react-redux';
+import './stylesheets/index.css';
+import App from './components/App';
+import rootReducer from './reducers';
+<b>import { getArticles } from './actions';</b>                                 <span>#1</span>
+
+const store = createStore(rootReducer, applyMiddleware(thunk, logger));
+
+<b>store.dispatch(getArticles());</b>                                           <span>#2</span>
+
+ReactDOM.render(
+  &lt;Provider store={store}>
+    &lt;App />
+  &lt;/Provider>, 
+  document.getElementById('root')
+);
+</pre>
+<p>
+<ol>
+  <li>Import the getArticles method from the actions folder. It doesn't exist yet but we'll define it next.</li>
+  <li>We are applying the dispatch method directly to the store object. It is calling the getArticles method which will do an API call then use an action to get the data in the store. This is the only time we will apply the dispatch method directly on the store. The rest of the actions will be dispatched from our components.</li>
+</ol>
+
+<p>The getArticles method includes our first Action. Since we will have several actions we will define them all in the actions folder.</p>
+<pre>
+// <b>src/actions/index.js</b>
+
+import axios from 'axios';                                           <span>#1</span>
+
+export const RECEIVE_ARTICLES = 'GET_ARTICLES';                      <span>#2</span>
+
+const apiUrl = 'http://localhost:3001/api/articles';                     <span>#3</span>
+
+export const getArticles = () => {                                   <span>#4</span>
+  return (dispatch) => {
+    return axios.get(`${apiUrl}.json`)                               <span>#5</span>
+      .then(response => {
+        dispatch({type: RECEIVE_ARTICLES, articles: response.data})  <span>#6</span>
+      })
+      .catch(error => { throw(error); });
+  };
+};
+</pre>
+<p>Let's break this down.</p>
+<ol>
+  <li>Import the Axios module to facilitate making AJAX calls to our API.</li>
+  <li>Redux recommends using string constants for our Action types rather than string literals, so we'll declare it here and use it below and later in our reducer function.</li>
+  <li>For convenience we'll create a variable for our API URL.</li>
+  <li>GetArticles() will make our API call and use the dispatch method to send an action to the reducer.</li> <br>
+  <li>Make an HTTP GET request to our API endpoint using AJAX via the Axios module.</li>
+  <li>Using ES6 Promises if we get a successful response we will call the dispatch method and send an Action. In this case the action type is RECEIVE_ARTICLES, and we are sending the API response data with the action as a payload called "articles." Then the reducer will add it to the store.</li>
+</ol>
+<p>Rather than defining our Action object directly in the dispatch method, we could create a separate Action Creation Function and call it from dispatch() like the below. We aren't going to do that in this tutorial, but be aware that's a common way to do it. And of course you can break all the action functions out this way if you like.</p>
+<pre>
+<b>const receiveArticles = (data) => ({
+  type: RECEIVE_ARTICLES,
+  articles: data,
+});</b>
+export const getArticles = () => {
+  return (dispatch) => {
+    return axios.get(`${apiUrl}.json`)
+      .then(response => {
+        dispatch(<b>receiveArticles(response.data)</b>)
+      })
+      .catch(error => { throw(error); });
+  };
+};
+</pre>
+<p>And if we wanted to add a "Loading..." spinner between when the API request is made and when the response is received, we could add another action called REQUEST_ARTICLES, and change the User Interface to show a spinner. But we'll keep it simple and skip that.</p>
+
+<p>Now that we've sent our retrieved articles to the reducer with our action, let's define the reducer.</p>
+<pre>
+// <b>src/reducers/articlesReducer.js</b>
+
+import { RECEIVE_ARTICLES } from '../actions';                           <span>#1</span>
+
+const initialState = { articles: [] }
+export default function articlesReducer(state = initialState, action) {  <span>#2</span>
+  switch (action.type) {
+    case RECEIVE_ARTICLES:                                               <span>#3</span>
+      return action.articles;
+    default:                                                             <span>#4</span>
+      return state;
+  }
+}
+</pre>
+<ol>
+<li>Import the RECEIVE_ARTICLES string constant we declared in the actions file.</li>
+<li>Declare our reducer function with two arguments, state and action. Use ES6 default parameter syntax to set the initial state to an empty articles array.</li>
+<li>Use a switch statement to match the action type. If the action type is RECEIVE_ARTICLES it returns the articles data to update the store with.</li>
+<li>You need a default case. If there is no match, the reducer will just return the current state.</li>
+</ol>
+
+<p>Now our store contains an an articles array with the articles from the API. Time to use that to change the User Interface. Replace our placeholder component with this:</p>
+<pre>
+// <b>src/components/ArticleList.jsx</b>
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import { Link } from 'react-router-dom';
+
+class ArticleList extends Component {
+  render() {                                                        <span>#1</span>
+    if(this.props.articles.length) {                                <span>#2</span>
+      return (
+        &lt;div>
+          &lt;h4>Articles&lt;/h4>
+          {this.props.articles.map(article => {                     <span>#3</span>
+            return (
+              &lt;div key={ article.id }>                              <span>#4</span>
+                &lt;hr/>          
+                &lt;h4>&lt;Link to={`/articles/${article.id}`}>{article.id}: {article.title}&lt;/Link>&lt;/h4>  <span>#5</span>
+                &lt;p>{article.content}&lt;/p>
+              &lt;/div>
+            );
+          })}
+        &lt;/div>
+      )    
+    } else {
+      return (&lt;div>No Articles&lt;/div>)
+    }
+  }
+}
+
+const mapStateToProps = (state) => ({ articles: state.articles });  <span>#6</span>
+
+export default connect(mapStateToProps)(ArticleList);               <span>#7</span>
+</pre>
+<ol>
+<li>The ArticleList component's render method returns the JSX that will be converted by React to HTML.</li>
+<li>Use a conditional to make sure there are articles (i.e., articles.length is truthy).</li>
+<li>Use the JavaScript map method to return each article in the format specified in the function.</li>
+<li>React requires a unique key to iterate over an array, so we'll use the article id.</li>
+<li>Use React-Router's Link component to add a hyperlink to each article title that will take the user to its ArticleInfo component (to be defined later).</li>
+<li>Notice in the render method that we are using <code>this.props</code> to access the articles. How did the articles array get into the component's props? With React-Redux's mapStateToProps method, that's how. This method you accesses the store's current state and maps it to your props according to your specifications. Here we are mapping the articles props to the articles array from the store.</li>
+<li>React-Redux's Connect method links Redux store to the React component. It takes the mappings from the mapStateToProps method and adds them to the props of the component listed just after it, ArticleList in this case.</li>
+</ol>
+<p>Now if you entered all the above code, and your API server is running on port 3001, you should be able to go to your browser and see your list of articles. Our first action is a success!</p>
+
+<hr class="space">
+<h4>Post Articles - Connect the ArticleAdd Component</h4>
+<p>We have good momentum after our first successful Redux Action. Time for our second. This time our component will display a form to submit a new article. We will send an HTTP POST request to the appropriate API endpoint, which should Create a new record in the database. Then we'll update the Redux store to add the new article to the articles array and redirect our route back to the ArticleList page.</p>
+<p>This time everything begins in the component. Replace the placeholder component with this new shiny one.</p>
+<pre>
+// <b>src/components/ArticleAdd.jsx</b>
+
+import React from 'react';
+import { connect } from 'react-redux';
+import { addArticle } from '../actions';                      <span>#1</span>
+
+class ArticleAdd extends React.Component {
+  state = { title: '', content: '' };
+
+  handleChange = (event) => {
+    this.setState({ [event.target.name]: event.target.value });
+  };
+
+  handleSubmit = (event) => {
+    event.preventDefault();
+    this.props.addArticle(this.state);                        <span>#4</span>        
+  };
+
+  render() {
+    return (
+      &lt;div>
+        &lt;h4>Add Article&lt;/h4>
+        &lt;form onSubmit={ this.handleSubmit }>
+          &lt;div className="form-group">
+            &lt;input type="text" name="title" required value={this.state.title} onChange={this.handleChange} 
+              className="form-control" placeholder="Title" />
+          &lt;/div>
+          &lt;div className="form-group">
+            &lt;textarea name="content" rows="5" required value={this.state.content} onChange={this.handleChange} 
+              className="form-control" placeholder="Content" />
+          &lt;/div>
+          &lt;button type="submit" className="btn btn-dark">Create&lt;/button>
+        &lt;/form>
+      &lt;/div>
+    );
+  }
+}
+
+const mapDispatchToProps = { addArticle };                     <span>#2</span>
+
+export default connect(null, mapDispatchToProps)(ArticleAdd);  <span>#3</span>
+</pre>
+<p>Most of this is similar to plain React. Set initial state to empty values. Create a form with fields that use the onChange event and a handle change handler function to update the fields as you type. And have an onSubmit event with a handle submit handler function. Then React-Redux takes over.</p>
+<ol>
+  <li>Import the addArticle function from the Actions file. It will handle our POST request and our Action.</li>
+  <li>Down at the bottom of the file is a React-Redux statement similar to the mapStateToProps function we defined in the ArticleList component. mapDisptachToProps is an object that holds all the action creation functions that will be called from our component. In this case there is just one, addArticle.</li>
+  <li>React-Redux's connect function adds the functions from mapDispatchToProps to the ArticleAdd component's props. Since we don't have a mapStateToProps function, set the first argument to null.</li>
+  <li>Now in our handleSubmit function, we can call the addArticle function and pass it the component's state with the form data.</li>
+</ol>
+
+<p>Time to define our addArticle function. We'll add it to the actions folder.</p>
+<pre>
+// <b>src/actions/index.js</b>
+
+import axios from 'axios';
+<b>import history from '../history';</b>
+
+export const RECEIVE_ARTICLES = 'GET_ARTICLES';
+<b>export const ADD_ARTICLE = 'ADD_ARTICLE';</b>
+
+const apiUrl = 'http://localhost:3001/api/articles';
+
+...
+
+export const addArticle = ({ title, content }) => {                                                      <span>#1</span>
+  return (dispatch) => {
+    return axios.post(`${apiUrl}.json`, {title, content})                                                <span>#2</span>
+      .then(response => {
+        let data = response.data;
+        dispatch({type: ADD_ARTICLE, payload: {id: data.id, title: data.title, content: data.content}})  <span>#3</span>
+      })
+      .then(() => {
+        history.push("/articles")                                                                        <span>#4</span>
+      })
+      .catch(error => { throw(error) });
+  };
+};
+</pre>
+<p>This is similar to the getArticles function. Only this time it is a post request so we are sending data.</p>
+<ol>
+<li>When the addArticle function is called, the form data is sent as the argument. It is an object with title and content properties.</li>
+<li>We use Axios to send an AJAX POST request to the API endpoint including the data object.</li>
+<li>If it is posted successfully, the API's server will return the new article data as a JSON string that Axios converts to a JavaScript object. Here we use the Redux dispatch method to send the action to the reducer, with the data in a payload property.</li>
+<li>Then we use React-Router and the history method we imported at the top of the file to redirect back to the /articles route.</li>
+</ol>
+
+<p>Last step is to add the action to the articlesReducer.</p>
+<pre>
+// <b>src/reducers/articlesReducer.js</b>
+
+import { RECEIVE_ARTICLES, <b>ADD_ARTICLE</b> } from '../actions';              <span>#1</span>
+
+const initialState = { articles: [] }
+export default function articlesReducer(state = initialState, action) {
+  switch (action.type) {
+    case RECEIVE_ARTICLES:
+      return action.articles;
+    <b>case ADD_ARTICLE:</b>                                                    <span>#2</span>
+      <b>return [action.payload, ...state];</b>
+    default:
+      return state;
+  }
+}
+</pre>
+<ol>
+  <li>Import ADD_ARTICLE from the actions folder.</li>
+  <li>Add the action type to the switch statement. It adds the new article to the beginning of the existing articles array from the store's current state.</li>
+</ol>
+<p>Now try it out. In the browser you should be able to click on the Add Article link, fill out and submit the form, and be redirected to the articles page with the new article on top. Second action complete!</p>
+
+<hr class="space">
+<h4>Get Article and Delete Article - Connect the ArticleInfo Component</h4>
+<p>Our articles page lists all the articles from the API, and each article title has a link to an ArticleInfo page. Clicking it will result in another HTTP GET request to the API URL appended with the article id (e.g., localhost:3001/articles/3). We will also have a button to send an HTTP DELETE request. From a database CRUD prespective we will be using Read and Delete commands.</p>
+<p>Start with the component:</p>
+<pre>
+// <b>src/components/ArticleInfo.jsx</b>
+
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import { Link } from 'react-router-dom';
+import { getArticle, deleteArticle } from '../actions';
+
+class ArticleInfo extends Component {
+  componentDidMount() {                                                         <span>#4</span>
+    this.props.getArticle(this.props.match.params.id);
+  }
+
+  render() {
+    const article = this.props.article;
+    return (
+      &lt;div>
+        &lt;h2>{article.id}: {article.title}&lt;/h2>
+        &lt;p>{article.content}&lt;/p>
+        &lt;div className="btn-group">
+          &lt;Link to={{ pathname: `/articles/${article.id}/edit`, state: { article: article } }} className='btn btn-info'>  <span>#5</span>
+            Edit
+          &lt;/Link>
+          &lt;button className="btn btn-danger" type="button" onClick={() => this.props.deleteArticle(article.id)}>          <span>#6</span>
+            Delete
+          &lt;/button>
+          &lt;Link to="/articles" className="btn btn-secondary">Close&lt;/Link>                                                 <span>#7</span>
+        &lt;/div>
+        &lt;hr/>
+      &lt;/div>
+    )
+  }
+}
+
+const mapStateToProps = (state) => ({ article: state.article });                 <span>#1</span>
+
+const mapDispatchToProps = { getArticle, deleteArticle };                        <span>#2</span>
+
+export default connect(mapStateToProps, mapDispatchToProps)(ArticleInfo);        <span>#3</span>
+</pre>
+<p class="mb-1">We'll go in the order that the statements are executed:</p>
+<ol>
+  <li>React-Redux's mapStateToProps method is the first to execute. There is initially no article loaded so there is nothing to map at first.</li>
+  <li>MapDispatchToProps maps the getArticle and deleteArticle functions imported from the actions file to the component's props.</li>
+  <li>React-Redux's connect method adds the mapped state and Dispatch functions to the ArticleInfo component's props.</li>
+  <li>componentDidMount is a built-in React function called once the component is mounted. This is where we call the getArticle method that will fetch the article data from the API. We are passing the article id as the argument, which uses React-Router's match method to get from the route parameter (e.g., articles/3 would be id:3).</li>
+  <li>React-Router provides the Link component which we'll use to add a link to the Edit page.</li>
+  <li>We are also adding a Delete button with an onClick event. Here we are defining the handler function directly in the element. It calls the deleteArticle function.</li>
+  <li>Use React-Router's Link component to link back to the Articles page.</li>
+</ol>
+
+<p>Add the getArticle and deleteArticle functions to the actions folder:</p>
+<pre>
+// <b>src/actions/index.js</b>
+
+import axios from 'axios';
+import history from '../history';
+
+export const RECEIVE_ARTICLES = 'GET_ARTICLES';
+export const ADD_ARTICLE = 'ADD_ARTICLE';
+<b>export const RECEIVE_ARTICLE = 'RECEIVE_ARTICLE';
+export const REMOVE_ARTICLE = 'REMOVE_ARTICLE';</b>
+
+const apiUrl = 'http://localhost:3001/api/articles';
+...
+export const getArticle = (id) => {
+  return (dispatch) => {
+    return axios.get(`${apiUrl}/${id}.json`)
+      .then(response => {
+        dispatch({type: RECEIVE_ARTICLE, article: response.data});
+      })
+      .catch(error => { 
+        throw(error); 
+      });
+  };
+};
+
+export const deleteArticle = (id) => {
+  return (dispatch) => {
+    return axios.delete(`${apiUrl}/${id}.json`)
+      .then(response => {
+        dispatch({type: REMOVE_ARTICLE, payload: {id}})
+      })
+      .then(() => {
+        history.push("/articles")
+      })
+      .catch(error => {
+        throw(error);
+      });
+  };
+};
+</pre>
+
+<p>Populate the articleReducer file. This is not the same file or reducer as article<b><u>s</u></b>Reducer. ArticleReducer manages state and actions for a single article object, while the articlesReducer manages state and actions for an array of article objects.</p>
+<pre>
+// <b>src/reducers/articleReducer.js</b>
+
+import { RECEIVE_ARTICLE } from '../actions';
+
+export default function articleReducer(state = {}, action) {  <span>#1</span>
+  switch (action.type) {
+    case RECEIVE_ARTICLE:                                     <span>#2</span>
+      return action.article;
+    default:
+      return state;
+  }
+};
+</pre>
+<ol>
+  <li>Set the initial state to an empty object.</li>
+  <li>If the action type is RECEIVE_ARTICLE then the reducer returns the article data to be added to the store.</li>
+</ol>
+<p>The deleteArticle function deletes the article from the database and redirects back to the Articles page. But we want the deleted article to be removed from the articles list. We could refresh the api query but that wouldn't be very efficient. Instead we use the articlesReducer to remove it from the articles array in the store.</p>
+<pre>
+// <b>src/reducers/articlesReducer.js</b>
+
+import { RECEIVE_ARTICLES, ADD_ARTICLE, <b>REMOVE_ARTICLE</b> } from '../actions';
+
+const initialState = { articles: [] }
+export default function articlesReducer(state = initialState, action) {
+  switch (action.type) {
+    case RECEIVE_ARTICLES:
+      return action.articles;
+    case ADD_ARTICLE:
+      return [action.payload, ...state];
+    <b>case REMOVE_ARTICLE:
+      return state.filter(article => article.id !== action.payload.id);</b>
+    default:
+      return state;
+  }
+}
+</pre>
+<p>Now test it out. Create an article, click on its info page, then delete it. That's two more actions we've successfully programmed. On to the final piece of CRUD. Update.</p>
+
+<hr class="space">
+<h4>Update Article - Connect the ArticleEdit Component</h4>
+<p>Now let's add an edit form that makes an HTTP PATCH request to the server and Updates an existing article in the database.</p>
+
+<pre>
+// <b>src/components/ArticleEdit.jsx </b>
+
+import React from 'react';
+import { connect } from 'react-redux';
+import { updateArticle } from '../actions';
+
+class ArticleEdit extends React.Component {
+  handleChange = (event) => {
+    this.setState({ [event.target.name]: event.target.value });
+  };
+
+  handleSubmit = (event) => {                                                             <span>#1</span>
+    event.preventDefault();
+    const id = this.props.article.id;
+    const title = this.state.title ? this.state.title : this.props.article.title;
+    const content = this.state.content ? this.state.content : this.props.article.content;
+    const article = {id: id, title: title, content: content}
+    this.props.updateArticle(article);
+  };
+
+  handleCancel = () => {
+    this.props.history.push(`/articles/${this.props.article.id}`);
+  }
+
+  render() {
+    return (
+      &lt;div>
+        &lt;h1>Edit {this.props.article.title}&lt;/h1>
+        &lt;form onSubmit={this.handleSubmit}>
+          &lt;div className="form-group">
+            &lt;label>Title&lt;/label>
+            &lt;input type="text" name="title" defaultValue={this.props.article.title} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="form-group">
+            &lt;label>Content&lt;/label>
+            &lt;textarea name="content" rows="5" defaultValue={this.props.article.content} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="btn-group">
+            &lt;button type="submit" className="btn btn-dark">Update&lt;/button>
+            &lt;button type="button" onClick={this.handleCancel} className="btn btn-secondary">Cancel&lt;/button>
+          &lt;/div>
+        &lt;/form>
+      &lt;/div>
+    );
+  }
+}
+
+const mapStateToProps = (state) => ({ article: state.article });
+
+const mapDispatchToProps = { updateArticle };
+
+export default connect(mapStateToProps, mapDispatchToProps)(ArticleEdit);
+</pre>
+<p class="mb-1">We won't go line by line this time since most of the concepts were covered in ArticleInfo and ArticleAdd.</p>
+<ol>
+  <li>In the handleSubmit handler function we are setting the id, title, and content properties. That's because if the user doesn't change a field it will be sent as undefined. So we use the ternary statement to set it to the original props value if the state value is undefined.</li>
+</ol> 
+<p>The original state is still the article object from ArticleInfo. We are not doing a database refresh pull since we already have the info in the store. In a production app you would add some code to do an API call if the user refreshes the edit page which will clear out the store, but we'll keep it simple and not do that.</p>
+
+<p>Now let's finish the Actions page. This is the final code.</p>
+<pre>
+// <b>src/actions/index.js</b>
+
+import axios from 'axios';
+import history from '../history';
+
+export const RECEIVE_ARTICLES = 'GET_ARTICLES';
+export const ADD_ARTICLE = 'ADD_ARTICLE';
+export const RECEIVE_ARTICLE = 'RECEIVE_ARTICLE';
+export const REMOVE_ARTICLE = 'REMOVE_ARTICLE';
+<b>export const UPDATE_ARTICLE = 'UPDATE_ARTICLE';
+export const REPLACE_ARTICLE = 'REPLACE_ARTICLE';</b>
+
+const apiUrl = 'http://localhost:3001/api/articles';
+
+export const getArticles = () => {
+  return (dispatch) => {
+    return axios.get(`${apiUrl}.json`)
+      .then(response => {
+        dispatch({type: RECEIVE_ARTICLES, articles: response.data})
+      })
+      .catch(error => { throw(error); });
+  };
+};
+
+export const addArticle = ({ title, content }) => {
+  return (dispatch) => {
+    return axios.post(`${apiUrl}.json`, {title, content})
+      .then(response => {
+        let data = response.data;
+        dispatch({type: ADD_ARTICLE, payload: {id: data.id, title: data.title, content: data.content}})
+      })
+      .then(() => {
+        history.push("/articles")
+      })
+      .catch(error => { throw(error) });
+  };
+};
+
+export const getArticle = (id) => {
+  return (dispatch) => {
+    return axios.get(`${apiUrl}/${id}.json`)
+      .then(response => {
+        dispatch({type: RECEIVE_ARTICLE, article: response.data});
+      })
+      .catch(error => { 
+        throw(error); 
+      });
+  };
+};
+
+export const deleteArticle = (id) => {
+  return (dispatch) => {
+    return axios.delete(`${apiUrl}/${id}.json`)
+      .then(response => {
+        dispatch({type: REMOVE_ARTICLE, payload: {id}})
+      })
+      .then(() => {
+        history.push("/articles")
+      })
+      .catch(error => {
+        throw(error);
+      });
+  };
+};
+
+<b>export const updateArticle = (article) => {</b><span>                                                                #1</span>
+  const articleId = article.id;
+  return (dispatch) => {
+    return axios.patch(`${apiUrl}/${article.id}.json`, {title: article.title, content: article.content})
+      .then(response => {
+        const data = response.data;
+        dispatch({type: UPDATE_ARTICLE, payload: {id: data.id, title: data.title, content: data.content}})
+        dispatch({type: REPLACE_ARTICLE, payload: {id: data.id, title: data.title, content: data.content}})
+      })
+      .then(() => {
+        history.push(`/articles/${articleId}`)
+      })
+      .catch(error => { throw(error) });
+  };
+};
+</pre>
+<ol>
+  <li>The updateArticle function uses Axios to send an AJAX PATCH request to the API. If successful, the server sends a response with the updated article object. Then we dispatch not one but two actions.</li>
+</ol>
+
+<p>The dispatch with action type UPDATE_ARTICLE goes to the articleReducer to change the article object in the store.</p>
+<pre>
+// <b>src/actions/articleReducer.js</b>
+
+import { RECEIVE_ARTICLE, <b>UPDATE_ARTICLE</b> } from '../actions';
+
+export default function articleReducer(state = {}, action) {
+  switch (action.type) {
+    case RECEIVE_ARTICLE:
+      return action.article;
+    <b>case UPDATE_ARTICLE:</b>
+      return {
+        id: action.id,
+        title: action.payload.title,
+        content: action.payload.content,
+      }
+    default:
+      return state;
+  }
+};
+</pre>
+
+<p>The dispatch with action type REPLACE_ARTICLE goes to the articlesReducer to replace the appropriate article object in the articles array.</p>
+<pre>
+// <b>src/actions/articlesReducer.js</b>
+
+import { RECEIVE_ARTICLES, ADD_ARTICLE, REMOVE_ARTICLE, <b>REPLACE_ARTICLE</b> } from '../actions';
+
+const initialState = { articles: [] }
+export default function articlesReducer(state = initialState, action) {
+  switch (action.type) {
+    case RECEIVE_ARTICLES:
+      return action.articles;
+    case ADD_ARTICLE:
+      return [action.payload, ...state];
+    case REMOVE_ARTICLE:
+      return state.filter(article => article.id !== action.payload.id);
+    <b>case REPLACE_ARTICLE:</b>
+      return state.map((article) => {
+        if (article.id === action.payload.id) {
+          return {
+            ...article,
+            title: action.payload.title,
+            content: action.payload.content,
+          }
+        } else return article;
+      })
+    default:
+      return state;
+  }
+}
+</pre>
+<p>Make sure all the files are saved, then try it out in the browser. Add an article, click to go to its info page, update it, then delete it. Congratulations you now have a fully functioning React with Redux and React Router app that can perform all four CRUD operations on the database through the API. Whew. </p>
+
+</div>
+</div>
+</body>
+</html>

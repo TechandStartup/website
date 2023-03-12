@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Build your own Ruby on Rails Tutorial</title>
+  <meta name="description" content="Learn Ruby and Rails by building your own simple web framework. Tutorial"> 
+  <meta name="keywords" content="Ruby on Rails, Web Framework Tutorial">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Rack, Webservers, and HTTP <small style="padding-left: 25px;">Build Your Own Rails - Part 1</small></h1>
+  <p>Learn Ruby and Rails by building your own very simplistic Rails-like Framework.</p>
+  <p><a href="build_rails">Back to Intro</a> | <a href="build_rails_2">On to Part 2</a><br>
+  Finished Code for this section: <a href="https://github.com/steve981cr/jailsfolder/tree/master/rackapp">Github</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<h3>Introducing Rack</h3>
+<p>
+<b>Rack Reference:</b><br>
+Rack Gem: <a href="https://rubygems.org/gems/rack">rubygems.org/gems/rack</a><br>
+Source Code: <a href="https://github.com/rack/rack">github.com/rack/rack</a><br>
+Rack Homepage: <a href="https://rack.github.io/">rack.github.io</a><br>
+Rack Docs:<br> 
+<span class="indent">Env Variable: <a href="http://www.rubydoc.info/github/rack/rack/master/file/SPEC">rubydoc.info/github/rack/rack/master/file/SPEC</a></span><br>
+<span class="indent">Rack Request Object: <a href="http://www.rubydoc.info/github/rack/rack/Rack/Request">rubydoc.info/github/rack/rack/Rack/Request</a></span><br>
+<span class="indent">Rack Response Object: <a href="http://www.rubydoc.info/github/rack/rack/Rack/Response">rubydoc.info/github/rack/rack/Rack/Response</a></span>
+</p>
+<b>Overview:</b>
+<p>Rack is Ruby software that provides a minimal interface for your application or framework to a Ruby web server such as Webrick (the default) and Puma. Rack takes the HTTP requests sent from the website user's browser (the client), passing it to the server to be processed. The server generates a response which Rack translates to an HTTP response which goes back to the client.</p>
+<p>Rack is packaged as a Ruby gem. Before Rack was created in 2007, Rails and every other Ruby framework had their own interfaces. That made it difficult to share code between frameworks. It has since been adopted as a standard. You can use Rack in a stand alone web application (referred to as a Rack application), or build a web framework on top of it.
+</p>
+<p> Rails is built on top of the Rack gem. If you look at the Rails gem on <a href="https://rubygems.org/gems/rails">rubygems.org</a> you'll see that Rails is separated into 10 components packaged as separate gems and listed as dependencies, along with the bundler gem. One of those is the ActionPack gem, and if you click it you'll see Rack listed as a dependency. When you create a Rails application, Rack will automatically be added to Gemfile.lock and used by the Rails framework and thus by your application.</p>
+
+<hr class="space">
+<h3>The HTTP Request-Response Cycle</h3>
+
+<p>When you enter a web address in your browser it will start with the protocol http:// or https://. Hypertext Transfer Protocol (HTTP) is an internet protocol which specifies how a client machine requests information or actions from a server and how the server sends back a response. This is called the request-response cycle. HTTP is a stateless protocol which means that each request is an independent transaction that is unrelated to any previous requests. So communication between the client's browser and the Website's server consists of independent pairs of a request and response.</p> 
+<p>The url you enter in your browser is translated into a numerical IP address by the DNS (Domain Name System) server that your network uses. When the user enters a URL in their browser they are making an HTTP request to your server. Along with the request comes various information, including the request method.</p>
+<p>HTTP defines methods (sometimes referred to as verbs) to indicate the desired action to be performed on the identified resource. The most common is a GET request which essentially means you want to get the information for that page to display on your browser. A POST request means you are sending data for the server to do something with, generally from a form you filled out. PUT and PATCH requests are to update data. PUT is for updating all fields, PATCH is for updating only specific fields. DELETE if to delete something. </p>
+<p>The request includes a header section. Some of the header fields are:</p>
+<ul>
+  <li><b>Host</b> - Domain name of the server and port if specified.</li>
+  <li><b>Referer</b> - The address of the previous web page from which a link to the current requested page was followed. This is how back buttons know where to go.</li>
+  <li><b>Cookie</b> - Any unexpired cookies your site sent them get sent back with each request.</li>
+  <li>Full list of the HTTP header fields: <a href="https://en.wikipedia.org/wiki/List_of_HTTP_header_fields">wikipedia.org/wiki/List_of_HTTP_header_fields</a></li>
+</ul>
+<p>Other information is sent as well, such as the client's ip address, so the server knows where to send the response back to.</p>
+<p>The server processes the request and sends back a Response. For a GET request, the body of the response will be the HTML for requested page, or JSON data, or whatever format the data is in. The response also includes response headers which should include:</p>
+<ul>
+  <li><b>Status</b> - Status code of the HTTP response. The most common are 200 for OK, 302 for a redirect, 404 for page not found, 500 for a server error. Full list is at: <a href="https://en.wikipedia.org/wiki/List_of_HTTP_status_codes">wikipedia.org/wiki/List_of_HTTP_status_codes</a></li>  
+  <li><b>Content-Type</b> - The media type of this content. For an HTML document that would be text/html. Other common types include: text/css, application/javascript, image/png, image/jpeg, image/gif, application/json, application/pdf. Full list: <a href="https://en.wikipedia.org/wiki/Media_type">wikipedia.org/wiki/Media_type</a></li>
+</ul>
+<p>Other response header fields include:</p>
+<ul>
+  <li><b>Location</b> - Used in redirection, or when a new resource has been created.</li>
+  <li><b>Set-Cookie</b> - an HTTP cookie for your site that contains a name and its value. It can also contain other attributes such as expiration date, or if the cookie only applies to a specific path in your site you can add Path=/<i>relevant-path</i>.</li>
+  <li>Full list of the HTTP response header fields: <a href="https://en.wikipedia.org/wiki/List_of_HTTP_header_fields#Response_fields">wikipedia.org/wiki/List_of_HTTP_header_fields#Response_fields</a></li>
+</ul>
+<p>At the end of this section are a couple of tools you can use to see the request and response details.</p>
+<br>
+
+<hr class="space">
+<h3>Setup</h3>
+<p>Create a master folder to hold our code called jailsfolder. While you can do that through Mac Finder or in Windows, I will be using UNIX commands for the command line interface (Terminal from now on) throughout this tutorial. There's a brief summary of these commands in the <a href="build_rails_2#unix">next section</a>. Go to the terminal and use the change directory (cd) command to get to wherever you want this folder to be: <br>
+<code class="cli">cd ~/<i>path/to/directory</i></code><br>
+Now create the directory and cd into it: <br>
+<code class="cli">mkdir jailsfolder; cd jailsfolder</code><br>
+This folder will hold our application and eventually our framework gem. But first we'll create a folder to hold a simple rack application. Make a directory called rackapp and cd into it: <br>
+<code class="cli">mkdir rackapp; cd rackapp</code></p>
+
+<hr class="space">
+<h3>Install the Rack gem</h3>
+<p>
+  Go to the terminal and see if Rack is already installed on your computer. <br>
+  <code class="cli">gem list rack</code><br>
+  If it is installed it will show up with the version number. Otherwise install it:<br> 
+  <code class="cli">gem install rack</code><br>
+  Or if it is an older version you can update it to the latest version:<br> 
+  <code class="cli">gem update rack</code>.
+</p>
+
+<hr class="space">
+<h3>How Rack Works</h3>
+<p>Quoting the Rack documentation: "A Rack application is a Ruby object (not a class) that responds to a call method. It takes exactly one argument, the environment and returns an Array of exactly three values: The status, the headers, and the body." Let's break this down.</p>
+<p>
+You start your Rack app by calling Rack's run method passing in your application object as the argument. Rack will automatically call a method named <i>call</i> on the application object so you need to define a <i>call</i> method in the application class, or use a Proc or Lambda instead which accept the call method by default. <br>
+Rack converts the HTTP request headers into a hash and assigns it to the <i>env</i> variable, which is passed in to the call method as an argument. (Rack Environment Docs: <a href="http://www.rubydoc.info/github/rack/rack/master/file/SPEC">rubydoc.info/github/rack/rack/master/file/SPEC</a>). <br>
+Rack's return value is an array of:</p>
+<ol>
+  <li>The HTTP response code (e.g., 200 for success).</li>
+  <li>A Hash of the response headers. You need to set the Content-Type to text/html to display it as HTML otherwise it will be displayed as text. Other options are JSON, XML, RSS, image/jpeg, etc. You can also return headers to set cookies, change security settings, etc.</li>
+  <li>The response body. This is your html, css, javascript, image or whatever is being returned for display. It must be an enumerable object, such as an Array or an IO object.</li>
+</ol>
+<p>Okay, let's start coding.</p>
+
+<hr class="space">
+<h3>Rack app in IRB</h3>
+<p>IRB (Interactive Ruby Shell) lets you execute Ruby code from the terminal. Let's make a simple Rack app in IRB. From your terminal open the IRB shell <code class="cli">irb</code>.</p>
+<p>In IRB first require rack to get access to the Rack gem. Then make a call to the Rack::Handler::WEBrick.run(<i>your app</i>) method which will start a Webrick server using port 8080. Pass in your application as the argument. In this case we'll create a Ruby proc object passing in the env variable and returning an array with the required three elements. A Proc, short for Procedure, is a block of code, similar to a method, that can be passed as an argument.
+<pre>
+require 'rack'
+Rack::Handler::WEBrick.run(Proc.new { |env| ['200', {'Content-Type' => 'text/html'}, ['Hello World']] })
+</pre>
+Now in your browser go to localhost:8080 and you should see the response "Hello World". This is a full Rack application, albeit as simple as they come. You could also add HTML tags. Stop the server by entering Control+C from the terminal window and enter:
+<pre>
+Rack::Handler::WEBrick.run(Proc.new { |env| ['200', {'Content-Type' => 'text/html'}, ['&lt;h1>Hello World&lt;/h1>']] })
+</pre>
+Refresh your browser and you should see it in an h1 header tag. Control+C to stop the server.<br>
+Now display the env variable hash as the response body using the inspect method which will turn the env hash into a string. 
+<pre>
+Rack::Handler::WEBrick.run(Proc.new { |env| ['200', {'Content-Type' => 'text/html'}, [env.inspect]] })
+</pre>
+Refreshing your browser you'll see the env hash's key-value pairs. <br>
+Or call out specific env variable values like request method, path info, and query string. A real web application will grab this information and use it to determine what controller action to call and a query string could be used to return specific information. Stop the server (Control+C) and enter:
+<pre>
+Rack::Handler::WEBrick.run(Proc.new { |env| ['200', {'Content-Type' => 'text/html'}, ["Request Method: " + env["REQUEST_METHOD"], "&lt;br>Path Info: " + env["PATH_INFO"], "&lt;br>Query String: " + env["QUERY_STRING"]]] })
+</pre>
+Add a path and query string to the URL and refresh the browser: localhost:8080/articles?title=Rack <br>
+You'll see the specific env variables. Since the response body is passed as an array, we broke it into different elements which Rack iterates over. Stop the server (Control+C).
+</p>
+<p>
+Now instead of a proc object we'll create a class named Application, which is what we'll be doing for our blog app.</p>
+<pre>
+class Application
+  def call(env)
+    [200, {'Content-Type' => 'text/html'}, ["Hello, world - From the Application class"]]
+  end
+end
+Rack::Handler::WEBrick.run(Application.new)
+</pre>
+<p>Refresh your browser to view it. You can remove the path and query string we added to the URL earlier or leave it since we are ignoring them.</p>
+<p>At the bottom we start the server by calling the Rack <i>run</i> method specifying WEBrick as the server. Rack works with objects. In the examples above we used a proc which returns an object. But that's too limiting for a real Web application. A class that holds our application will allow us to add a lot more functionality. So in the argument to the run method we need to return an object from such a class.</p>
+<p>Above our call to the Rack run method we defined our application class which we called Application, but it could be any name. When the Rack run method calls Application.new, Ruby will instantiate a new instance of the Application class (i.e., a new Application object). Just defining the Application class without the call method would be enough to create the object and allow Rack to start the server.</p>
+<p>With the server running, Rack is waiting for an HTTP request to be made to the server. When one comes, Rack will automatically call a method named <i>call</i> on our Application instance and pass it the envirnoment hash as the argument. So we need to define a "call" method with a parameter to accept the environment hash. If we don't we'll get a NoMethodError. The other half of the HTTP request-response cycle is for our server to send a response back. So our call method is super simple. It just returns the 3 element array that Rack converts to an HTTP response.</p>
+
+
+<hr class="space">
+<h3>Rack Up</h3>
+<p>Let's put our code into files. If you go to a Rails application there will be a file called config.ru in the app's root directory. This is a Rack convention. Let's follow suit by creating a config.ru file. And we'll separate our Application class into it's own file in a config directory. In the terminal, make sure you are in the blog directory. Create the config.ru file, a <i>config</i> directory, and an application.rb file using the UNIX commands:<br> 
+<code>touch config.ru</code><br> 
+<code>mkdir config; touch config/application.rb</code></p>
+
+<p>And populate them with the below: 
+<pre>
+<b># config.ru</b>
+require_relative('config/application.rb')
+run(Application.new)
+</pre>
+<pre>
+<b># config/application.rb</b>
+class Application
+  def call(env)
+    [200, {'Content-Type' => 'text/html'}, ["Hello, world - Using Rackup"]]
+  end
+end
+</pre>
+Go to the terminal and make sure you stop the server (control+C) and exit IRB (control+D) so you are back in the system shell. Then run the Rack app:<br>
+<code>rackup</code> <br>
+Go to the browser, but now the default port has changed to localhost:9292. There you will see the response body in the browser. </p>
+<p>So what just happened? Rackup is a Rack command that initializes a Server object. A Rack server object by default uses port 9292, and it uses one of the following server libraries in this order - thin/puma/webrick/mongrel. Since Webrick is the only one that is part of the Ruby standard library, it is the default. Rack will look for a file called config.ru to open and execute it's code. To modify this configuration you can add options to the rackup command: <br>
+<code>rackup --port 3000</code> or shorthand <code>rackup -p 3000</code> will change the port to 3000 (or whatever valid port you choose). <br>
+<code>rackup --server puma</code> or shorthand <code>rackup -s puma</code> will use puma as the server library, assuming you have installed the puma gem. <br>
+<code>rackup rack_app.ru</code> will look for a file called rack_app.ru instead of the config.ru default to open and run the code. You can use any file name but use the .ru extension.
+</p>
+<p>
+When we use a config.ru file and start the server with the <i>rackup</i> command, we don't need to require Rack like we did in the terminal. In the config.ru file we call Rack's run command and pass a new Application.new object as the argument. We've opted to put the Application class in it's own file in config/application.rb and used the require_relative method to access it.
+</p>
+
+<hr class="space">
+<h3>Rack Middleware</h3>
+<p>Middleware provides services to the software application. To run a Rack application we used the <i>run</i> command. To use Rack middleware use the <i>use</i> command. You can add a chain of middleware components between the application and the web server. Some handy Rack middleware include:</p>
+<p><b>Rack Reloader:</b> automatically reloads the application every time you make a request, similar to what Rails does in development mode. Default cooldown time is 10 seconds. You can overide this and set it to 0 so it reloads with every change. This will save us from having to stop and restart our server every time we make a change to a Ruby file. Use it in development, but not in production.
+<code class="pre">use(Rack::Reloader, 0)</code></p>
+
+<p><b>Rack ContentType:</b> Sets a default Content-Type header for responses which don't have one.
+<code class="pre">use(Rack::ContentType, "text/plain")</code> 
+When no content type argument is provided, “text/html” is assumed.</p>
+
+<p><b>Rack Static:</b> Lets you serve static files like stylesheets, javascripts, and images from a specified directory. You can include this now and we'll add static files later.
+<code class="pre">use(Rack::Static, :urls => ["/stylesheets", "/javascripts", "/images"], :root => "app/assets")</code></p>
+
+<hr class="space">
+<h3>Using Rack's Request object</h3>
+Reference: <a href="http://www.rubydoc.info/github/rack/rack/Rack/Request">rubydoc.info/github/rack/rack/Rack/Request</a>
+<p>Rack has Request and Response classes that give you the option to create request and response objects. You instantiate a request object with <code>Rack::Request.new(env)</code>. Then you can access env information with Rack request methods like path, cookies, query_string, referer, request_method, body, and more. Creating a Rack Request object is optional. It will make your syntax more Ruby-like. So instead of <code>env["REQUEST_METHOD"], env["PATH_INFO"], env["QUERY_STRING"]</code> you can create a Rack Request object, assign it to a variable <code>request = Rack::Request.new(env)</code>, then access request headers with <code>request.request_method, request.path, request.query_string</code>. You can also apply boolean methods such as <code>request.post?</code> which returns true if it is a POST request. Similar methods include get?, patch?, put?, and delete?. <code>request.xhr?</code> will check if it is an AJAX request. POST returns the data received in the request body. The <code>request.params</code> method returns the POST request body plus any params from a query_string.</p> 
+<p>In the below example, we'll use the <i>puts</i> method to print various env variables (request method, path, params) to the terminal. We'll also put the request object in the response body so you can see it in the browser. Browsers will automatially make a request for the favicon to path /favicon.ico. Since we don't have a favicon we'll create a conditional that returns status code 500 and no headers or body so we don't see any error messages logged on the terminal.</p>
+<pre>
+<b># config/application.rb</b>
+class Application
+  def call(env)
+    request = Rack::Request.new(env)
+    if request.path == "/favicon.ico"
+      return [ 500, { }, [] ]
+    end
+    puts("-"*80)
+    puts("Request method: " + request.request_method)
+    puts("Path: " + request.path)
+    puts("Params: " + request.params.to_s)
+    puts("Title Param: " + request.params["title"])
+    ['200', {'Content-Type' => 'text/html'}, [request.inspect]]
+  end
+end
+</pre>
+<p>Restart the server (Control+C, <code>rackup</code>), and in the browser enter a URL with <i>articles</i> path and a query string
+<code>localhost:9292/articles?title=LearnRack</code> <br>
+The web page displays the request object as before, but now look at the terminal. You'll see something returned for each puts method. Puts means put string. It prints the argument you provide it to the terminal. So here we've printed a text label followed by a request object property including <i>request_method</i>, <i>path</i>, the <i>params</i> hash, and the <i>params</i> title value. We'll be using puts statements in our framework to log what's going on at different steps. The last statement of the call method returns our Rack response array, displaying the request object as the response body. The inspect method returns the object as a string so it can be displayed.</p>
+
+<hr class="space">
+<h3>Using Rack's Response object</h3>
+Reference: <a href="http://www.rubydoc.info/github/rack/rack/Rack/Response">rubydoc.info/github/rack/rack/Rack/Response</a>
+<p>Instantiating a response object is optional, but it makes it easier to generate the response array.
+The response object constructor is:
+<code class="pre">initialize(body = [], status = 200, header = {}) {|_self| ... }</code>
+This means that when you create a new Rack Response object, it has parameters for the same three response elements as the plain Rack response, but in a different order. The response body is first, then status code, then the response headers. And it sets defaults for each. An empty array [] for body, 200 (i.e., success) for status, and an empty hash for the response headers. Since we added Rack middleware to use content type text/html as default, we can leave content_type out of our response header if we want. We'll leave it in generally for clarity.</p>
+<p>You can instantiate a response object with: 
+<code class='pre'>Rack::Response.new([<i>body</i>], <i>status</i>, {<i>response headers</i>})</code>
+Applying this to the call method would look something like the below. You can just replace what we had before with this:
+<pre>
+<b># config/application.rb</b>
+class Application
+  def call(env)
+    Rack::Response.new(["HTML Template will go here."], 200, {"Content-Type" => "text/html"})
+  end
+end
+</pre>
+Since we added the Rack Reloader we shouldn't need to stop and restart the server. Just refesh the browser and you should see the above response.<br>
+Other examples of response objects include returning a 404 page not found error: <br>
+<code class="pre">Rack::Response.new(["Nothing found"], 404, {"Content-Type" => "text/html"})</code>
+Return an internal server error: <br>
+<code class="pre">Rack::Response.new(["Internal error"], 500, {"Content-Type" => "text/html"})</code></p>
+
+<h5>Redirect Rack Response</h5>
+<p>Do a redirect using the Location response header, with no response body, and status 302: <br>
+<code class="pre">Rack::Response.new([], 302, {"Location" => "http://google.com"})</code></p>
+<p>If you put the above response in the call method and refresh the browser, then the response header's Location option should redirect you to Google.</p>
+
+<h5>Rack Response using Rack's Redirect Method</h5>
+<p>You'll notice the Response constructor allows for a block where you can apply Rack Response methods such as set_cookie, delete_cookie, redirect, and more. Let's use the Response class redirect method in a block. Since it's only one short statement we'll use an inline block.
+<code class="pre">Rack::Response.new { |_self| _self.redirect("https://stackoverflow.com/", 302) }</code>
+You can use any name for the block variable. The second argument for the redirect method is the status code. But it defaults to 302 so you can leave it out if you wish. So this is just a different way to do a redirect using a Rack Response object helper method. If you put that response in the call method and refresh the browser it will redirect you to the very useful stackoverflow programming Q&A website.</p>
+
+<h5>Build a Rack Response Including Rack's Redirect Method</h5>
+<p>You can also create an empty Rack Response object assigned to a variable and then iteratively create your response. <!-- You can use the write(<i>string</i>) method to add a body, set_header(<i>key, value</i>) method to set headers, and set the status property directly. You can apply other methods as well such as redirect(), set_cookie(), delete_cookie(), etc. But if you do this you must call the finish method at the end so Rack knows that the response object is ready to send. --> We'll just chain the redirect method to our response object. Then to let Rack know we are ready to send the response object, chain the finish method to it.</p>
+<pre>
+def call(env)
+  response = Rack::Response.new 
+  response.redirect("http://ruby-doc.org/", 302)
+  response.finish
+end
+</pre>
+<p>If you put the above in the call method and refresh your browser it will redirect you to the Ruby Docs homepage.</p>
+
+<h5>Case Statement with Different Rack Responses</h5>
+<p>Let's use a case statement to return different responses by request.path_info (i.e., route):</p>
+<pre>
+<b># config/application.rb</b>
+class Application
+  # Instantiate a Request object, return Response object depending on URL path.
+  def call(env)
+    request = Rack::Request.new(env)
+    case request.path_info
+    when "/"
+      Rack::Response.new(["&lt;p>Cookie: name=#{request.cookies["name"]}&lt;/p>",
+          "&lt;p>&lt;a href='/delete-cookie'>Delete-Cookie&lt;/a>&lt;/p>",
+          %q(&lt;form method="post" action="/set-cookie">
+              &lt;input name="name" type="text" placeholder="Enter Name">
+              &lt;input type="submit" value="Set-Cookie">
+            &lt;/form>),
+          "&lt;a href='/redirect-me'>Redirect to build-response&lt;/a> | &lt;a href='/nowhere'>bad link&lt;/a>"], 
+        200, {"Content-Type" => "text/html"})
+    when "/set-cookie"
+      Rack::Response.new do |response|
+        response.set_cookie("name", request.params["name"])
+        response.redirect(request.referer)
+      end 
+    when "/delete-cookie"  
+      Rack::Response.new do |response|
+        response.delete_cookie("name")
+        response.redirect(request.referer)
+      end
+    when "/redirect-me"
+      Rack::Response.new([], 302, {"Location" => "/build-response"})
+    when "/build-response"
+      response = Rack::Response.new
+      response.write("&lt;a href='/'>Home&lt;/a>")
+      response.status = 200
+      response.set_header("Content-Type", "text/html")
+      response['Custom-Header'] = 'Some info'
+      response.set_cookie("name", {value: "Sheena", path: "/", expires: Time.now + (60*60*24*365*20)})
+      response.finish
+    else
+      Rack::Response.new(["Nothing Found"], 404, {"Content-Type" => "text/html"})
+    end
+  end
+end
+</pre>
+<p>In your browser go to localhost:9292 and you should see links to add and delete a cookie, and the cookie value will be displayed. There is also a link that redirects, and an invalid link. Below is an explanation of each case:</p>
+<p>
+  <b>/</b> - When there is no path we'll return an array of HTML elements that includes (1) the value of the "name" cookie; (2) a link to the <i>/delete-cookie</i> path; (3) a form to create a cookie that holds the user's name; (4) links to the <i>/redirect</i> and <i>/nowhere</i> paths. The form is enclosed in %q() which is the equivalent of single quotes. %Q() is the equivalent of double quotes. Use that syntax when a string is broken into multiple lines. Another syntax for multi-line strings is a Here Document, which we'll use in Part 5.<br>
+  <b>/set-cookie</b> - When the link to the /set-cookie path is clicked, this path will set a cookie with the key of "name" and value sent with the POST request data. POST request data is accessible from the request params hash. It will then redirect back to the referer.<br>
+  <b>/delete-cookie</b> - When the link to the /delete-cookie path is clicked, this path will delete a cookie with the key of "name". It will then redirect back to the referer.<br>
+  <b>/redirect-me</b> - When the link to /redirect-me is clicked, this path will redirect to the /build-response path. <br>
+  <b>/build-response</b> - The redirect will go to the /build-response path where we'll create an empty Rack Response object and iteratively add a body, status, header content-type, a custom header (you can give it any name), and change the <i>name</i> cookie's value to "Sheena", setting the expiration to 20 years from now. Default cookie expiration is the end of the session when the user closes their browser.<br>
+  <b>else</b> - Finally, if the path is none of the above we'll return a "Nothing Found" body and status 404.</p>
+
+
+<hr class="space">
+<h3>Rack Authentication</h3>
+<p>
+Rack::Auth::Basic is another Rack middleware that implements HTTP Basic Authentication. Add a block that checks if a username and password pair are valid.</p>
+<pre>
+<b># config.ru</b>
+use Rack::Auth::Basic, "Restricted Area" do |username, password|
+  username == "admin"
+  password == "secret"
+end
+</pre>
+<p>If you refresh your browser it will ask for your user name and password. This is very basic authentication and not something you would generally use in production. Especially since we are not encrypting our password. A robust authentication system is a large topic out of scope for this tutorial.</p>
+
+<hr class="space">
+<h3>Final Rack Setup</h3>
+<p>This just about wraps up the Rack portion of this tutorial. In the next section we will cover routing. For the final version of our code use the following:</p>
+<pre>
+<b># config.ru</b>
+require_relative('config/application.rb')
+
+# Set default Content-Type response header.
+use(Rack::ContentType, "text/html")
+# Automatically reload the application when a *.rb file is changed in development.
+use(Rack::Reloader, 0)
+# Serve static files from app/assets
+use(Rack::Static, :urls => ["/stylesheets", "/javascripts", "/images"], :root => "app/assets")
+
+# Rack method to instantiate a new Blog::Application object.
+run(Application.new)
+</pre>
+
+<pre>
+<b># config/application</b>
+class Application
+  # Instantiate a Request object, return Response object depending on URL path.
+  def call(env)
+    request = Rack::Request.new(env)
+    case request.path_info
+    when "/"
+      Rack::Response.new(["&lt;p>Cookie: name=#{request.cookies["name"]}&lt;/p>",
+          "&lt;p>&lt;a href='/delete-cookie'>Delete-Cookie&lt;/a>&lt;/p>",
+          %q(&lt;form method="post" action="/set-cookie">
+              &lt;input name="name" type="text" placeholder="Enter Name">
+              &lt;input type="submit" value="Set-Cookie">
+            &lt;/form>),
+          "&lt;a href='/redirect-me'>Redirect to build-response&lt;/a> | &lt;a href='/nowhere'>bad link&lt;/a>"], 
+        200, {"Content-Type" => "text/html"})
+    when "/set-cookie"
+      Rack::Response.new do |response|
+        response.set_cookie("name", request.params["name"])
+        response.redirect(request.referer)
+      end 
+    when "/delete-cookie"  
+      Rack::Response.new do |response|
+        response.delete_cookie("name")
+        response.redirect(request.referer)
+      end
+    when "/redirect-me"
+      Rack::Response.new([], 302, {"Location" => "/build-response"})
+    when "/build-response"
+      response = Rack::Response.new
+      response.write("&lt;a href='/'>Home&lt;/a>")
+      response.status = 200
+      response.set_header("Content-Type", "text/html")
+      response['Custom-Header'] = 'Some info'
+      response.set_cookie("name", {value: "Sheena", path: "/", expires: Time.now + (60*60*24*365*20)})
+      response.finish
+    else
+      Rack::Response.new(["Nothing Found"], 404, {"Content-Type" => "text/html"})
+    end
+  end
+end
+</pre>
+
+<hr class="space">
+<h3>Useful Tools</h3>
+<p>I promised I would list a couple of useful tools for viewing and working with HTTP requests and responses. Thought I was bluffing? Well I wasn't. I recommend going through our new Rack app and viewing the Request and Response headers and data to help make it a little more tangible.</p>
+<h4>Chrome Developer Tools</h4>
+<p>Docs: <a href="https://developer.chrome.com/devtools">developer.chrome.com/devtools</a></p>
+<p>The major browsers have tools for developers to view a web page's source HTML and the request-response data among other things. Google Chrome has one called Developer Tools that is preloaded with Chrome or easily enabled. You can start Developer tools on a Mac by pressing Cmd+Alt+I or by right clicking a web page and selecting Inspect from the popup menu. A window will appear at the bottom of the browser with lots of useful information and options. The Elements menu lets you see the HTML grouped by expandable DOM nodes. The console menu gives you a JavaScript console.</p>
+<p>You can also see the request-response headers and data. To see the request headers your browser sends to the server, go to the page displaying our Rack app. Right click on the page > Select Inspect > Network tab > Refresh the page (Cmd+R) > Select the first request on the left (that will be the page you requested) > Headers tab. In the General section you'll see the request URL, the Request method (GET, POST, PUT, PATCH, or DELETE), and your IP address. Scroll down to the Request Headers section and you'll additionally see any cookies from this website that were sent back by the browser, and the Referer which is the last URL visited before this one (used for the back button). If you submitted a form you'll also see a Form Data section with the data you submitted. <!-- You can read more about the process on this blog <%#= link_to 'rve.org.uk/dumprequest', 'http://rve.org.uk/dumprequest' %>. --></p>
+<p>In the same window you will see the server response headers. That includes the Status Code (200 for a successful request), the Content-Type which will be text/html for an HTML document, any cookies that are set, and various other information. The response also includes the most important part, the HTML that you are viewing on your screen.</p><br>
+
+<h4>Curl</h4>
+<p>Docs: <a href="https://curl.haxx.se/docs/manpage.html">curl.haxx.se/docs/manpage</a></p>
+<p>Curl is a command line tool/utility. It acts like a web browser (the client) sending HTTP requests to the server and displaying the returned response. But instead of doing this from a browser, you send the request by typing in curl commands in the terminal, and viewing the response also in the terminal. It's a tool to use when developing or troubleshooting requests and responses to your website.</p>
+<p>To see if you have it installed you can try to access the Curl help, which will show all the options. Or the curl manual:
+<code class="pre">curl --help</code>
+<code class="pre">curl --manual</code>
+<p>Below are some useful Curl commands:<br>
+Send a request to the given URI. -X GET specifies the HTTP GET method.
+<code class="pre">curl -X GET http://localhost:9292</code>
+GET is the default method so you can leave it out.
+<code class="pre">curl http://localhost:9292/build-response</code>
+The -i option includes the HTTP response headers in the output.
+<code class="pre">curl -i http://localhost:9292</code>
+The -v option (for verbose) shows the request and response headers.
+<code class="pre">curl -v http://localhost:9292</code>
+-X POST indicates a POST request and the -d option is to send the form data. Similar to -X GET, -X POST is inferred if you include the -d option so you can leave it out. The -e option is for the referer URL since there is a redirect. 
+<code class="pre">curl -v http://localhost:9292/set-cookie -d "name=Joey" -e http://localhost:9292</code>
+</p>
+
+<hr class="space">
+<p><a href="build_rails_2">On to Part 2 - MVC File Structure</a></p>
+<!-- 
+Check out Rack's use Logger (see mini-rails apps config.ru file)
+<p>Read more about Rack: <br>
+<%#= link_to 'blog.gauravchande.com/what-is-rack-in-ruby-rails', 'http://blog.gauravchande.com/what-is-rack-in-ruby-rails' %><br>
+<%#= link_to 'gist.github.com/markbates/4240848 ', 'https://gist.github.com/markbates/4240848' %><br>
+<%#= link_to 'zaiste.net/posts/concisely_about_rack_applications', 'https://zaiste.net/posts/concisely_about_rack_applications/' %>
+And the Railscast tutorial ~/Sites/rails/gems-mine/rack-app
+<p>
+# -->
+</div>
+</body>
+</html>

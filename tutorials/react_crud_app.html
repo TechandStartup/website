@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>React CRUD Tutorial</title>
+  <meta name="description" content="Tutorial on how to make a React front end UI to perform CRUD (Create-Read-Update-Delete) actions through an API."> 
+  <meta name="keywords" content="React tutorial, React CRUD">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>React CRUD App Tutorial</h1>
+  <p>Create a React Front End with React Router</p>
+  <p>By Steve Carey - Last Updated 7/3/2019</p>
+  <ul>
+    <li><a href="#api-only">Create an API-only app</a></li>
+    <li><a href="#react">Create a React front end</a></li>
+    <li><a href="#foreman">Foreman (run both servers with one command)</a></li>
+  </ul>
+  <p>Finished code for this section combined with the Rails API: <a href="https://github.com/steve981cr/rails-api-with-react">Github</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<h2>Introduction</h2>
+
+<!-- react intro -->
+<p>This is part of a series of tutorials on APIs and the React library. See the full list at <a href="../tutorials">Tutorials</a>. Throughout this series we build a Create-Read-Update-Delete (CRUD) application with a React front end and a Ruby on Rails back end. Each section is self-contained.</p>
+
+<p>The <a href="rails_api">first tutorial</a> in this series showed you how to build a Rails Application Programming Interface (API). This section will show you how to build the matching React client as a separate application. We will be interacting with the Rails API we created, but if you prefer to make the API with another framework it would also apply. The back end needs a database table named "articles" with fields for id, title, and content, and a server-side application to provide the API endpoints.</p>
+
+<p>React is a JavaScript library for building user interfaces. It represents the View part of the Model-View-Controller architecture that Rails and probably most web application frameworks use. You need a separate back-end API with endpoints to interact with to get, post, update or delete data.</p>
+<h4>Prerequisites</h4>
+<p>This tutorial assumes you already have some familiarity with React. If you are brand new to React it is possible to do this tutorial while simulaneously learning React. The React.js website has good information including a <a href="https://reactjs.org/docs/getting-started.html">Getting Started</a> guide, an <a href="https://reactjs.org/tutorial/tutorial.html">introductory tutorial</a>, and a <a href="https://reactjs.org/docs/hello-world.html">Main Concepts</a> section. You should be familiar with the concepts of JSX, render, components, props, state, lifecycle, events, lists/keys, and forms. Going through this tutorial should give you a solid grasp on these concepts. We will be using the React Router package for routing so it helps if you have some familiarity with it, but that's also something you can learn as you go. You'll certainly be seeing it in action.</p>
+<p>React is all in with ES6. It uses the Babel compiler to transpile ES6 to ES5 so you don't need to worry about end user browser support. This tutorial assumes you are familiar with ES6 syntax for classes, arrow functions, let and const variables, template strings using back ticks (``), module imports, and promises. We will be using all of those.</p>
+
+<hr class="space">
+<!-- Rails API only -->
+<h3 id="api-only">Rails API-only Application</h3>
+<p>Beginning with Rails 5.0 you have the option of generating an API only application instead of the traditional Rails app. A Rails API-only app is a slimmed down version of a regular Rails web app, skipping the Asset Pipeline and generation of view and helper files. You can read the details in the <a href="https://guides.rubyonrails.org/api_app.html">Rails Guides - API App</a>.</p>
+
+<li class="dlr"><code>mkdir <i>appname</i>; cd <i>appname</i></code></li> 
+<li>If you are using RVM for Ruby and Gems version control you can set your gemset at this point.</li>
+<p class='my=0'>To generate an API-only app just add the --api flag</p>
+<li class="dlr"><code>rails new . --api</code></li>
+
+<li class="dlr"><code>rails generate scaffold Article title:string content:text</code></li>
+<li class="dlr"><code>rails db:migrate</code></li>
+<li>Add some seed data to db/seeds.rb</li>
+<pre>
+# db/seed.rb
+articles = Article.create([
+  {title: "Learn Ruby", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."},
+  {title: "Learn Rails", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."},
+  {title: "Learn React", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."}
+])
+</pre>
+<li class="dlr"><code>rails db:seed</code></li>
+<p class="mt-3 mb-1">Add the rack-cors gem to prevent Rails from blocking cross browser access, since our front end and back end will be running on different ports.</p>
+<pre>
+# Gemfile
+gem 'rack-cors'
+</pre>
+<li class="dlr"><code>bundle install</code></li>
+<pre>
+# config/application.rb
+module ArticlesAppWithApi
+  class Application < Rails::Application
+    ...
+    config.middleware.insert_before 0, Rack::Cors do
+      allow do
+        origins 'http://localhost:3000'
+        resource '*', :headers => :any, :methods => [:get, :post, :put, :patch, :delete, :options]
+      end
+    end
+  end
+end
+</pre>
+<p class='mt-3 mb-1'>Add an "api" namespace to the routes. This will avoid potential route collisions between your back-end api and your front-end react routes.</p>
+<pre>
+# config/routes.rb
+scope '/api' do
+  resources :articles
+end
+</pre>
+
+<li class="dlr"><code>rails server -p 3001</code></li>
+<li>View the JSON data at http://localhost:3001/api/articles</li>
+<p><b>Done!</b></p>
+
+<hr class="space" id='react'>
+<!-- react_client -->
+<h2>React Client</h2>
+<h3>Setup</h3>
+<h4>Create-react-app</h4>
+<p>You need to have Node and Yarn installed on your computer to use React. We will install and use create-react-app to get us going.</p>
+<p class='mb-1'>Create-react-app is a Node package developed by Facebook that configures your React app for you and gives you a starter app out of the box. It includes an already configured Webpack server that bundles all the JavaScript files in our app into a bundle.js file that gets attached into the index.html file at runtime. At runtime, Webpack’s dev server will listen for you to save changes in develepment, and will automatically load your running web page with the changes. This is called hot reloading. Install it as a Node global package:
+<li class="dlr"><code>npm install -g create-react-app</code></li></p>
+<p class='mb-1'>We already created a Rails application that we will be using as our back end. We could keep the front end and back end code in completely separate locations, but if we are to deploy our application in production as an integrated web application it's easier to keep them together. We'll add a directory called client to our Rails project and place our React application there.</p>
+
+<li class="dlr"><code>create-react-app client</code></li>
+<p class="dlr"><code>cd client</code></p>
+
+<p class='mb-1'>Now believe it or not we actually have a working React app ready to go. Start the server: <br>
+<p class="dlr"><code>yarn start</code></p>
+And this should open your browser to localhost:3000 and greet you with a Welcome to React web page including a spinning logo. We're in business.</p>
+
+<h4>Third party packages and Yarn</h4>
+<p>We will be using two third party packages, React Router for routing and Axios for AJAX requests.</p>
+<p>Yarn and npm (Node Package Manager) are both package managers for managing JavaScript dependencies. You can use either, but since React and Yarn were both created by Facebook, they tend to interact tightly together so we will be using Yarn to install packages (<code>yarn install <i>package-name</i></code>) and run the server (<code>yarn start</code>).</p>
+<p>If you don't want to cd into the client folder you can run the yarn commands from the project root directory by inserting the current working directory (cwd) option like this: <code>yarn --cwd client start</code>.</p>
+
+<h4># client/package.json</h4>
+<p>Inside our React file structure is package.json. This file lists the locally installed packages as dependencies. You should see react, react-dom, and react-scripts in there. This file is loosely akin to the Rails Gemfile. You can read about it at <a href="https://docs.npmjs.com/getting-started/using-a-package.json">docs.npmjs.com - package.json</a>.
+<p class='mt-3 mb-1'>Install the react-router-dom and axios packages:</p>
+<p class="dlr"><code>yarn add react-router-dom axios</code></p>
+
+<p>Now if you look back at the packages.json file you should see those packages as dependencies.</p>
+
+<h4>File Structure</h4>
+<p>If you look at the files and directories generated in the client directory, besides a folder for the node_modules you'll see a "public" and a "src" directory. These are where you add your own files. Right now there are no sub-directories in those folders so things can get pretty cluttered quickly if we don't add some structure. From the <i>client</i> directory use these UNIX commands to add new folders, move files in them, and add the files we'll need for our React app. Or do it manually if you prefer.</p>
+<pre>
+mkdir public/images
+mv public/favicon.ico public/images/favicon.ico
+mkdir src/images
+mkdir src/stylesheets
+mkdir src/components
+mv src/logo.svg src/images/logo.svg
+mv src/index.css src/stylesheets/index.css
+mv src/App.css src/stylesheets/App.css
+mv src/App.js src/components/App.jsx
+mv src/App.test.js src/components/App.test.js
+touch src/components/Home.jsx
+touch src/components/ArticleList.jsx
+touch src/components/ArticleInfo.jsx
+touch src/components/ArticleAdd.jsx
+touch src/components/ArticleEdit.jsx
+</pre>
+<p>In the public directory we created a folder for images then moved the favicon image there. In the src directory we created folders for our components, stylesheets, and images and moved the relevant files there. Much better, except now our React app is broken. Fix the broken links and imports to get it working again:</p>
+<pre>
+# public/index.html 
+&lt;link rel="shortcut icon" href="%PUBLIC_URL%/images/favicon.ico">
+</pre>
+<pre>
+# src/index.js
+import './stylesheets/index.css';
+import App from './components/App';
+</pre>
+<pre>
+# src/components/App.jsx
+import logo from '../images/logo.svg';
+import '../stylesheets/App.css';
+</pre>
+<p>Save each file after you make the changes, then go check the browser. The app should be working again.</p>
+
+<h4>Stylesheets</h4>
+<p>The index.css file is for our app-wide css. The App.css file is specific to the App.component we are going to fill out. Delete the CSS that's in there now so it doesn't conflict with our app. If you want to add custom CSS classes this is where you would do it.</p>
+<pre>
+# src/stylesheets/App.css
+/* Remove all the CSS classes */
+</pre>
+
+<p>For convenience we'll use the Bootstrap CDN to style our app. You can either put the CDN link in the head element of the index.html file:</p>
+<pre>
+# client/public/index.html 
+&lt;link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.2/css/bootstrap.min.css" integrity="sha384-Smlep5jCw/wG7hdkwQ/Z5nLIefveQRIY9nfy6xoR1uRYBtpZgI6339F5dgvm/e9B" crossorigin="anonymous">
+</pre>
+To use the JavaScript features you need to load jQuery, popper, and Bootstrap. Just before the closing body tag add:
+<pre>
+&lt;script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+&lt;script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+</pre>
+Or alternatively put it in the index.css stylesheet. Of course, feel free use your own styles if your prefer.
+<pre>
+# client/src/stylesheets/index.css 
+@import url('https://stackpath.bootstrapcdn.com/bootstrap/4.1.2/css/bootstrap.min.css');
+</pre>
+
+<hr class="space">
+<h3>React Components</h3>
+<h4># public/index.html</h4>
+<p>This is a Single-Page Application (SPA) with CRUD capabilities. It is indeed single page. We only have one html file sitting in the public folder: public/index.html. It has your standard HTML page structure with one element inside the body. An empty div tag with id name of root <code>&lt;div id="root">&lt;/div></code>. That is where React renders it's output with JavaScript. There's nothing special about the name "root." It can be any name.</p>
+<h4># src/index.js</h4>
+<p>Then in the src/index.js file we import the React library and render our main component. Your src/index.js file should look like this.</p>
+<pre>
+import React from 'react';                                     <span>#1a</span>
+import ReactDOM from 'react-dom';                              <span>#1b</span>
+import './stylesheets/index.css';
+import App from './components/App';                            <span>#1c</span>
+import * as serviceWorker from './serviceWorker';
+
+ReactDOM.render(&lt;App />, document.getElementById('root'));     <span>#2</span>
+serviceWorker.unregister();                                    <span>#3</span>
+</pre>
+<ol>
+<li>We import the React and ReactDOM libraries, and the App.jsx file (containing the App component). </li>
+<li>The ReactDOM module's render method is what renders your React components to the public/index.html page. It takes two arguments. The first calls our component which is a custom React element called "App", or whatever name you want to give it. The second argument is the target element where we will render the output from &lt;App />. In this case the element with the id of "root".</li>
+<li>The service worker is a web API that helps you cache your assets and other files so that when the user is offline or on a slow network they can still see results on the screen.</li>
+</ol>
+<h4>Components</h4>
+
+<p>Let's talk about the files we created in the components directory. With React you split your user interface into components. Each component returns some JSX which ultimately gets rendered as HTML to the user interface. In our case we are creating the front end to a CRUD application. In a Rails application we would have our layout file that would contain our navigation bar and yield our views. Then for our Articles resource we would have views for index, show, new, and edit.</p> 
+<p>For our React app, a logical split for our components is to mirror the Rails resource structure. Our App.jsx file is like the Rails app/views/layouts/application.html.erb file. It holds the structure for our web page. The ArticleList, ArticleInfo, ArticleAdd, and ArticleEdit files correspond to the Rails index, show, new, and edit view files respectively. We'll also add a Home component to be our home page. Note that component names must be capitalized. Each file will hold a separate React component, with the exception of App.jsx which will hold three. We could break it out even further, like a form component that gets imported to the ArticleAdd and ArticleEdit components, but we won't.</p>
+
+<h4>Home Component</h4>
+<p>Let's start out with a very simple component called Home. We already created an empty Home.jsx file. Populate it with the below:</p>
+<pre>
+<span># src/components/Home.jsx</span>
+import React from 'react';       <span>1</span>
+
+const Home = () => {             <span>2</span>
+  return (
+    &lt;div className="jumbotron">
+      &lt;h1>Home Page&lt;/h1>
+    &lt;/div>
+  );
+}
+
+export default Home;             <span>3</span>
+</pre>
+<ol>
+<li>We are (1) importing React, (2) creating a component, (3) then exporting it. </li>
+<li>You can create components with functions or classes. We are using a function expression assigned to the variable "Home." It uses the ES6 arrow function syntax with no arguments and returns some JSX. JSX looks like HTML but it actually isn't. Not yet anyway. You'll notice subtle differences like you have to use the <i>className</i> attribute instead of <i>class</i> since class is a reserved word in JavaScript. But React ultimately converts JSX to HTML through its ReactDOM.render method.</li>
+</ol>
+<p>Right now this file is just sitting in space not connected to anything. If you want to see it in action you can temporarily open the src/index.js file and change the App elements to Home. Then go to your browser and it should now say "Home Page."</p>
+<pre>
+# src/index.js
+...
+import <b>Home</b> from './components/<b>Home</b>';
+...
+ReactDOM.render(<b>&lt;Home /></b>, document.getElementById('root'));
+</pre>
+<p>Change the index.js file back the way it was. Referencing "App."</p>
+
+<hr class="space">
+<h4>App component</h4>
+<p>The term Single-Page App can be a little misleading. While it is indeed a single html page, that doesn't mean you can't have multiple views with changes to the URL. We will use the React Router package that we installed to do just that. And we will also perform the standard CRUD actions in our single page interacting with the API to get articles, post new articles, edit existing articles, and delete articles. Instead of doing those things all on separate HTML pages as you would in an traditional web app, we will do it from our single page using AJAX calls with the help of the Axios package we installed. React will move the data around using JavaScript which can add significant speed over entire page loads from the server.</p>
+<p>You may have noticed we changed the extension of the App file from .js to .jsx. Either will work since React converts .jsx files into .js files when it is compiled. But since that file does contain JSX in it, it is more correct to give it the .jsx extension in my opinion. Also I installed the Babel package in my (Sublime Text) text editor which gives me automatic JSX syntax highlighting for files with the .jsx extension. </p>
+<p>The central component for our app is the App component. That is what is returning the Welcome to React page we see in the browser. Replace that with a Navigation bar and a place to render the other components. Here is the code for the App.jsx file all at once:</p>
+<pre>
+<span># src/components/App.jsx</span>
+import React, { Component } from 'react';
+import {BrowserRouter as Router, Route, NavLink, Switch} from 'react-router-dom';
+import '../stylesheets/App.css';
+import Home from './Home';
+import ArticleList from './ArticleList';
+import ArticleInfo from './ArticleInfo';
+import ArticleAdd from './ArticleAdd';
+import ArticleEdit from './ArticleEdit';
+
+class App extends Component {
+  render() {
+    return (
+      &lt;div className="App">     
+        &lt;Router>
+          &lt;div className="container">
+            &lt;Navigation />
+            &lt;Main />
+          &lt;/div>
+        &lt;/Router>
+      &lt;/div>
+    );
+  }
+}
+
+const Navigation = () => (
+  &lt;nav className="navbar navbar-expand-lg navbar-dark bg-dark">
+    &lt;ul className="navbar-nav mr-auto">
+      &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/">Home&lt;/NavLink>&lt;/li>
+      &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/articles">Articles&lt;/NavLink>&lt;/li>
+    &lt;/ul>
+  &lt;/nav>
+);
+
+const Main = () => (
+  &lt;Switch>
+    &lt;Route exact path="/" component={Home} />
+    &lt;Route exact path="/articles" component={ArticleList} />
+    &lt;Route exact path="/articles/new" component={ArticleAdd} />
+    &lt;Route exact path="/articles/:id" component={ArticleInfo} />
+    &lt;Route exact path="/articles/:id/edit" component={ArticleEdit} />
+  &lt;/Switch>
+);
+
+export default App;
+</pre>
+<p>First thing's first. Once you add the code and save the file, go to the browser and make sure you didn't get any errors. We removed the Welcome to React header and logo and replaced it with a navigation bar with two links, and a simple home page jumbotron. If you click on the articles link you'll get a blank page because we haven't populated that yet.</p> 
+<p>This page is all about Navigation and the React Router package. React Router is the most popular Routing package. The docs are at <a href="https://reacttraining.com/react-router/web/guides/philosophy">reacttraining.com/react-router/web/guides</a> which looks like a third party training site, and it is. But they are the ones who created the React Router package (not Facebook's React team).</p>
+<p>Alright, let's break this down.</p>
+<p><b>At the top are all of our imports:</b></p>
+<pre>
+import React, { Component } from 'react';                                         #1
+import {BrowserRouter as Router, Route, NavLink, Switch} from 'react-router-dom'; #2
+import '../stylesheets/App.css';
+import Home from './Home';                                                        #3                     
+import ArticleList from './ArticleList';
+import ArticleInfo from './ArticleInfo';
+import ArticleAdd from './ArticleAdd';
+import ArticleEdit from './ArticleEdit';
+</pre>
+<p>
+1) To create a component we need to import the React library. <br>
+2) Import the components you need from the react-router-dom module. React Router also has a react-router-native module for mobile apps. In this case we'll import the BrowserRouter (giving it an alias of Router), Route, NavLink, and Switch components.<br>
+
+3) Import the other components that we will be calling with our Routes. Each of those files will contain a class or functional component. We could just put those in the App file then we wouldn't have to import them. And indeed we did do that for the Navigation and Main components. 
+
+</p>
+<p><b>The App class component's render method:</b></p>
+<pre>
+class App extends Component {
+  render() {
+    return (
+      &lt;div className="App">  
+        &lt;Router>                            #1
+          &lt;div className="container">
+            &lt;Navigation />                  #2
+            &lt;Main />                        #3
+          &lt;/div>
+        &lt;/Router>
+      &lt;/div>
+    );
+  }
+}
+</pre>
+<p>1) In the App class render method we appended the &lt;Router> element to manage our routing. It contains two custom elements:<br>
+2 & 3) &lt;Navigation /> and &lt;Main /> are custom elements that call the corresponding components. Nothing special about those names, you could call them what you like. Those components return JSX that gets inserted into the App component. </p>
+
+<p><b>The Navigation component:</b></p>
+<pre>
+const Navigation = () => (                                          #1
+  &lt;nav className="navbar navbar-expand-lg navbar-dark bg-dark">
+    &lt;ul className="navbar-nav mr-auto">
+      &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/">Home&lt;/NavLink>&lt;/li>             #2
+      &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/articles">Articles&lt;/NavLink>&lt;/li> #3
+    &lt;/ul>
+  &lt;/nav>
+);
+</pre>
+<p>1) The Navigation component returns JSX that ultimately renders the nav bar using the Bootstrap classes we provide here. <br>
+  2&3) The React Router NavLink component is a subset of a Link component that we'll use shortly. It provides the activeClassName property to style the link differently when it's active. The other thing to note is the "exact" attribute, which is the shorthand for "exact=true." That means the route has to be the exact route provided with the "to" attribute. The default is that it just contains the route provided. So the "/" route by default would include any route that contains "/", which is all routes. So we need the <i>exact</i> attibute here.</p>
+
+<p><b>The Main component:</b></p>
+<pre>
+const Main = () => (                                                      #1
+  &lt;Switch>                                                                #2
+    &lt;Route exact path="/" component={Home} />                             #3
+    &lt;Route exact path="/articles" component={ArticleList} />
+    &lt;Route exact path="/articles/new" component={ArticleAdd} />
+    &lt;Route exact path="/articles/:id" component={ArticleInfo} />
+    &lt;Route exact path="/articles/:id/edit" component={ArticleEdit} />
+  &lt;/Switch>
+);
+</pre>
+<p>1) The <i>Main</i> component is where we insert all our Route elements. <br>
+2) The React Router switch statement works like a JavaScript switch statement. It checks each statement below it in order until there is a match. <br>
+3) Route is a React Router element that takes as attributes the path and the component to call if there is a match. The "exact" attribute requires the match be exact.</p>
+
+<hr class="space">
+<h4>ArticleList component</h4>
+<p>Now it's time to do our first API call. We'll go to the server to retrieve a list of all the articles in the database. In our file structure setup we created the ArticleList.jsx file which will be our React equivalent to the Rails index.html.erb file. Populate it with the ArticleList component below and save it.</p>
+<pre>
+<span># src/components/ArticleList.jsx</span>
+import React, { Component } from 'react';
+import { get } from 'axios';
+import { Link } from 'react-router-dom';
+
+class ArticleList extends Component {
+  constructor() {
+    super();
+    this.state = { articles: [] };
+  }
+
+  componentDidMount() {
+    get('http://localhost:3001/api/articles.json')
+      .then(response => { 
+        this.setState({articles: response.data});
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  render() {
+    return (
+      &lt;div>
+        {this.state.articles.map((article) => {
+          return(
+            &lt;div key={article.id}>
+              &lt;h2>&lt;Link to={`/articles/${article.id}`}>{article.title}&lt;/Link>&lt;/h2>
+              {article.content}
+              &lt;hr/>
+            &lt;/div>
+          )     
+        })}
+        &lt;Link to="/articles/new" className="btn btn-outline-primary">Create Article&lt;/Link>  
+      &lt;/div>
+    )
+  }
+}
+
+export default ArticleList;
+</pre>
+<p>Let's see if it works. Since we will be calling the Rails API application we created in Part 1, make sure the server is running on port 3001.</p>
+<p class="dlr"><code>rails server -p 3001</code></p> 
+<p>Now if you go to the browser and click on the Articles link you should see a list of articles. This corresponds with the JSON view at http://localhost:3001/api/articles.json which you can view in a separate browser tab. The connection to the API is working! Also, notice that we are running two separate servers on two different ports. One for the Rails back-end app and one for the React front-end app.</p>
+<p>Time to break it down starting with... </p>
+<p><b>The imports:</b></p>
+<pre>
+import React, { Component } from 'react';  #1
+import { get } from 'axios';               #2
+import { Link } from 'react-router-dom';   #3
+</pre>
+<p>
+1) Import "Component" from the React library. <br> 
+2) We need to make an AJAX call using the HTTP GET method so we need to import that from the Axios package we added earlier. <br>
+3) We will include links to the the individual Article pages and to the New Article form, so import the Link component from the react-router-dom module.</p>
+
+<b>ArticleList and the Constructor:</b>
+<pre>
+class ArticleList extends Component {   #1
+  constructor() {                       #2
+    super();
+    this.state = { articles: [] };      #3
+  }
+</pre>
+<p>1) We create a class component called ArticleList. <br>
+2) At the top it needs a constructor function. <br>
+3) In it we set the initial state to an empty articles array:</p>
+
+<p><b>ComponentDidMount:</b></p>
+<pre>
+  componentDidMount() {                               #1
+    get('http://localhost:3001/api/articles.json')    #2
+      .then(response => {                             #3
+        this.setState({articles: response.data});     #4
+      })
+      .catch(error => console.log('error', error));   #5
+  }
+</pre>
+<p>
+1) Then we use the built-in React componentDidMount() method. This is called a lifecycle method since it changes the state of the component. <br>
+2) It contains our AJAX call to the API. <br>
+3) and uses ES6 promises to wait for the response. <br>
+4) Once received it uses the React setState method to assign the response data object to the empty articles array we declared in the constructor. <br>
+5) Add a catch method to log any errors to the console.</p>
+
+<p><b>Render:</b></p>
+<pre>
+  render() {                                          #1
+    return (
+      &lt;div>
+        {this.state.articles.map((article) => {       #2
+          return(
+            &lt;div key={article.id}>                    #3
+              &lt;h2>&lt;Link to={`/articles/${article.id}`}>{article.title}&lt;/Link>&lt;/h2>          #4
+              {article.content}
+              &lt;hr/>
+            &lt;/div>
+          )     
+        })}
+        &lt;Link to="/articles/new" className="btn btn-outline-primary">Create Article&lt;/Link>  #5
+      &lt;/div>
+    )
+  }
+</pre>
+<p>
+1) The render method returns JSX listing each article
+2) This.state.articles is an array of the article objects we got from the API. The JavaScript map method iterates though the array transforming each item based on the function provided and returning a new transformed array. <br>
+3) React requires that we assign a unique key to each item when iterating though a list, so we are assigning the article id attribute. <br>
+4) Here we transform the article objects into JSX that puts the article title into a link, displays the article content, and adds a horizontal line at the bottom. <br>
+5) At the end we include a link to the new articles route.</p>
+
+<h4>Tools</h4>
+<p>If you want to get a better understanding of state then make use of logging. Add a <code>console.log("this.state", this.state);</code> statement in the constructor before setting this.state to the empty articles array. Then add it to the componentDidMount() method before and after setting state to the response.data. Then go to the web page and open Chrome Developer tools (or the Firefox equivalent) and view the console tab. You'll see the lifecycle of this state. First it is undefined. Then it's an object with an empty articles property. Then, it's an object with an articles array containing objects for each article returned.</p>
+<p>Another useful tool is the React Developer Tools plugin for Chrome or Firefox. If you Google it you'll see the link and can install it directly to your browser. Then when you open Developer Tools on your web page there will be a new React tab to the right. Click on it and you can either drill down to the ArticleList component or use the search box to find the ArticleList component right away. Then to the right you can see the props and state objects.</p>
+
+<hr class="space">
+<h4># src/components/ArticleInfo.jsx</h4>
+<p>On to the ArticleInfo component which would correspond in Rails with an apps/views/articles/show.html.erb file. Populate the file with the below and save it.</p>
+<pre>
+import React, { Component } from 'react';
+import axios from 'axios';
+import { Link } from 'react-router-dom';
+
+class ArticleInfo extends Component {
+  constructor() {
+    super();
+    this.state = { article: {} };
+    this.handleDelete = this.handleDelete.bind(this);
+  }
+
+  componentDidMount() {
+    axios.get(`http://localhost:3001/api/articles/${this.props.match.params.id}.json`)
+      .then((response) => { 
+        this.setState({
+          article: response.data
+        })
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  handleDelete() {
+    axios.delete(`http://localhost:3001/api/articles/${this.props.match.params.id}.json`)
+      .then(() => {
+        this.props.history.push("/articles")
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  render() {
+    return (
+      &lt;div>
+        &lt;h2>{this.state.article.id}: {this.state.article.title}&lt;/h2>
+        &lt;p>{this.state.article.content}&lt;/p>
+        &lt;p>
+          &lt;Link to={`/articles/${this.state.article.id}/edit`} className="btn btn-outline-dark">Edit&lt;/Link> 
+          &lt;button onClick={this.handleDelete} className="btn btn-outline-dark">Delete&lt;/button> 
+          &lt;Link to="/articles" className="btn btn-outline-dark">Close&lt;/Link>
+        &lt;/p>
+        &lt;hr/>
+      &lt;/div>
+    )
+  }
+}
+
+export default ArticleInfo;
+</pre>
+<p>Now test it out in the browser. From the Articles page, if you click on an article title it should take you to the article page. If you click on the second article (with id 2), it will call the API endpoint which you can also view directly at http://localhost:3001/api/articles/2.json.</p>
+<p><b>The Imports:</b></p>
+<pre>
+import React, { Component } from 'react';
+import axios from 'axios';                   #1
+import { Link } from 'react-router-dom';
+</pre>
+<p>The imports are the same as for ArticleList. <br>
+1) The only thing to note is we are importing the whole Axios library rather than just the specific methods we are using (get and delete). That's because "delete" is a JavaScript reserved word. Since we're import the whole Axios library, we call the specific methods with axios.get and axios.delete.</p>
+<p><b>The constructor:</b></p>
+<pre>
+  constructor() {
+    super();
+    this.state = { article: {} };                      #1
+    this.handleDelete = this.handleDelete.bind(this);  #2
+  }
+</pre>
+<p>1) The constructor is similar to ArticleList except we set state to an empty article object rather than an empty articles array.<br>
+2) Also in this component we are including a delete button which will send an HTTP request to delete the article. You have to bind event handler functions like handleDelete in the constructor. If you don't it won't work. The explanation as why you need to bind is kind of involved so we won't go into detail. But in short, JavaScript will change what "this" means when the (onClick) event calls a separate handler function. From the object (like  article id: 2) to undefined. Binding "this" to the this.handleDelete() function in the constructor will prevent that change.</p>
+
+<p><b>ComponentDidMount:</b></p>
+<pre>
+  componentDidMount() {                                #1
+    axios.get(`http://localhost:3001/api/articles/${this.props.match.params.id}.json`) #2
+      .then((response) => {                            #3
+        this.setState({
+          article: response.data
+        })
+      })
+      .catch(error => console.log('error', error));    #4
+  }
+</pre>
+<p>1) The componentDidMount() method is similar to the same method in ArticleList.
+  2) But we do need to send the article id with our GET request to the API. So now the props object comes into play. If you look in the Chrome Developer Tools "React" tab and search on ArticleList you'll see the props and state objects in the pane to the right. Props contains three objects, one of which is called Match. Match contains the path (articles/:id), the url (articles/2), and another object called params. Params contains a single path param of :id. So to get the article id we need to chain this all together with <code>this.props.match.params.id</code>.<br>
+3) When the response to the AJAX request comes back we will use the setState method to assign the empty article object to the response data for article 2 (or whatever article we clicked on). <br>
+4) If you manually enter an id in the URL that doesn't exist then the catch method takes over. We'll log the error message to the console. In this case it will log a 404 status code, meaning the record wasn't found.</p>
+
+<p>Let's jump down to the render method next.</p>
+<p><b>Render:</b></p>
+<pre>
+  render() {
+    return (                                                                               #1
+      &lt;div>
+        &lt;h2>{this.state.article.id}: {this.state.article.title}&lt;/h2>
+        &lt;p>{this.state.article.content}&lt;/p>
+        &lt;p>
+          &lt;Link to={`/articles/${this.state.article.id}/edit`} className="btn btn-outline-dark">Edit&lt;/Link> #2
+          &lt;button onClick={this.handleDelete} className="btn btn-outline-dark">Delete&lt;/button>              #3
+          &lt;Link to="/articles" className="btn btn-outline-dark">Close&lt;/Link>                                #4
+        &lt;/p>
+        &lt;hr/>
+      &lt;/div>
+    )
+  }
+</pre>
+<p>1) This returns the JSX to be displayed in the "Main" element. We are also creating three buttons. <br>
+2&4) Two are links to other URLs which the router will use to determine the appropriate component to call. <br>
+3) There is also a button with an onClick attribute. That's a React event that will call the specified handler function, handleDelete(), when the button is clicked.</p>
+<p><b>HandleDelete:</b></p>
+<pre>
+  handleDelete() {                                   #1
+    axios.delete(`http://localhost:3001/api/articles/${this.props.match.params.id}.json`) #2
+      .then(() => {
+        this.props.history.push("/articles")         #3
+      })
+      .catch(error => console.log('error', error));
+  }
+</pre>
+<p>1) When the user clicks the "Delete" button, the onClick event calls the handleDelete handler function. <br>
+2) We use the Axios library to send a delete request to the provided URL.<br>
+3) We use ES6 promises when the request is complete to call the articles route. <code>This.props.history.push("/articles")</code> seems like an odd line of code for what is essentially a redirect. Here's the logic. We saw earlier in Chrome Dev Tools that the props contained three objects: history, location, and match. The history object contains a stack of the URL locations visited with the most recent on top, including the current path at the very top. "Push" is a JavaScript method that adds an item to the end of an array, so pushing the articles route to the end (top) of the history stack will make that route the current location. Ta-dah.</p>
+<p>Now go to the web page, click on an article. Then click the cancel button. It should take you back to the Article List page. Select another article and this time click delete. Poof, it's gone. Or should be if everything is working correctly. And that means you have both read and write access to the API. You should now be back to the articles list page minus one article.</p>
+
+<hr class="space">
+<h4># src/components/ArticleAdd.jsx</h4>
+<p>Since we deleted one of our informative articles, written by the Roman philosopher Cicero no less, we might as well create one to replace it. Let's add that capability. Populate the ArticleAdd.jsx file with the below.</p>
+<pre>
+import React, { Component } from 'react';
+import { post } from 'axios';
+
+class ArticleAdd extends React.Component {
+  constructor() {
+    super();
+    this.state = { title: '', content: ''};
+    this.handleChange = this.handleChange.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this);
+    this.handleCancel = this.handleCancel.bind(this);
+  }
+
+  handleSubmit(event) {
+    event.preventDefault();
+    post('http://localhost:3001/api/articles.json', this.state)
+      .then((response) => {
+        this.props.history.push(`/articles/${response.data.id}`);
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  handleChange(event) {
+    this.setState({ [event.target.name]: event.target.value });
+  }
+  
+  handleCancel() {
+    this.props.history.push("/articles");
+  }
+
+  render() {
+    return (
+      &lt;div>
+        &lt;h1>Create Article Post&lt;/h1>
+        &lt;form onSubmit={this.handleSubmit}>
+          &lt;div className="form-group">
+            &lt;label>Title&lt;/label>
+            &lt;input type="text" name="title" value={this.state.title} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="form-group">
+            &lt;label>Content&lt;/label>
+            &lt;textarea name="content" rows="5" value={this.state.content} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="btn-group">
+            &lt;button type="submit" className="btn btn-dark">Create&lt;/button>
+            &lt;button type="button" onClick={this.handleCancel} className="btn btn-secondary">Cancel&lt;/button>
+          &lt;/div>
+        &lt;/form>
+      &lt;/div>
+    );
+  }
+}
+
+export default ArticleAdd;
+</pre>
+<p>Test it out to make sure it works. From the Articles List page click on the Create Article button. There should be a form. First hit the cancel button to make sure you go back to the Articles list page. Click Create Article again and this time write an article. Write about your first family vacation and what childhood lessons you learned from it. Then click create and you should be taken to your new article info page. Nice! But, how did we get here?</p>
+<p><b>The Imports:</b></p>
+<pre>
+import React, { Component } from 'react';
+import { post } from 'axios';             #1
+</pre>
+<p>1) Import the <i>post</i> method from Axios.</p>
+<p><b>ArticleAdd component's constructor function: </b></p>
+<pre>
+class ArticleAdd extends React.Component {
+  constructor() {
+    super();
+    this.state = { title: '', content: ''};            #1
+    this.handleChange = this.handleChange.bind(this);  #2
+    this.handleSubmit = this.handleSubmit.bind(this);  #3
+    this.handleCancel = this.handleCancel.bind(this);  #4
+  }
+</pre>
+<p>1) We set the state to an object with properties that align with our form fields, set to empty values. By doing so we make these controlled components which you can read about in the <a href="https://reactjs.org/docs/forms.html#controlled-components">React Docs</a> if you want to know what that means.<br>
+2-4) We also need to bind the event handler functions that we'll be defining below.</p>
+<p>Let's jump down to the render method.</p>
+<p><b>Render:</b></p> 
+<pre>
+  render() {
+    return (                                                              #1
+      &lt;div>
+        &lt;h1>Create Article Post&lt;/h1>
+        &lt;form onSubmit={this.handleSubmit}>                               #4a
+          &lt;div className="form-group">
+            &lt;label>Title&lt;/label>
+            &lt;input type="text" name="title" value={this.state.title} onChange={this.handleChange} className="form-control" />     #2
+          &lt;/div>
+          &lt;div className="form-group">
+            &lt;label>Content&lt;/label>
+            &lt;textarea name="content" rows="5" value={this.state.content} onChange={this.handleChange} className="form-control" /> #3
+          &lt;/div>
+          &lt;div className="btn-group">
+            &lt;button type="submit" className="btn btn-dark">Create&lt;/button> #4b
+            &lt;button type="button" onClick={this.handleCancel} className="btn btn-secondary">Cancel&lt;/button>
+          &lt;/div>
+        &lt;/form>
+      &lt;/div>
+    );
+  }
+}
+</pre>
+<p>1) The render function returns JSX to display our form. <br>
+2&3) There is an input field and a text field. React treats text fields as a self closing element just like input fields. Notice each field has a name attribute, value attribute, and an onChange attribute. When the user types a character in the field it triggers the onChange event which calls the handleChange hander function. That will update the state which will change the value attribute in the form field. That happens after every character is typed. <br>
+4a and 4b) The form element has an onSubmit attribute which calls the handleSubmit handler function when the user clicks the submit button.
+</p>
+<p><b>HandleChange:</b></p>
+<pre>
+  handleChange(event) {
+    this.setState({ [event.target.name]: event.target.value }); #1
+  }
+</pre>
+<p>1) When the handleChange handler function is called, the event object includes the target (i.e., the form field element) which has attributes for name and value. That changes the state on whatever field the user is typing in. You can see this in action by adding <code>console.log(event.target);</code> to the handleChange function then look at the console after typing in a character. You can also look at the React tab in the console after drilling down to the ArticleAdd component and you will see State update after every key is pressed.</p>
+
+<p><b>HandleSubmit:</b></p>
+<pre>
+  handleSubmit(event) {                                           #1
+    event.preventDefault();                                       #2
+    post('http://localhost:3001/api/articles.json', this.state)   #3
+      .then((response) => {
+        this.props.history.push(`/articles/${response.data.id}`); #4
+      })
+      .catch(error => console.log('error', error));
+  }
+</pre>
+<p>1) When the user clicks the form's submit button, it triggers the onClick event which calls the handleSubmit handler function. <br>
+2) Normally when an HTML form is submitted a new page is called. Since we are sending the data via AJAX and don't want to be sent to a new page we need add preventDefault(). <br>
+3) We'll sent a POST request to the API endpoint sending the current state. <br>
+4) Then using ES6 promises, when the new article is returned we'll use the response.data object to get the id so we can redirect to the correct ArticleInfo route.</p>
+
+<hr class="space">
+<h4># src/components/ArticleEdit.jsx</h4>
+<p>Only one more component to go. Here's the code.</p>
+<pre>
+import React from 'react';
+import { get, patch } from 'axios';
+
+class ArticleEdit extends React.Component {
+  constructor() {
+    super();
+    this.state = { title: '', content: ''};
+    this.handleChange = this.handleChange.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this);
+    this.handleCancel = this.handleCancel.bind(this);
+  }
+
+  componentDidMount() {
+    get(`http://localhost:3001/api/articles/${this.props.match.params.id}.json`)
+      .then((response) => {
+        this.setState(response.data);
+      })
+      .catch(error => console.log('error', error));      
+  }
+
+  handleSubmit(event) {
+    event.preventDefault();
+    patch(`http://localhost:3001/api/articles/${this.state.id}.json`, this.state)
+      .then(() => {
+        this.props.history.push(`/articles/${this.state.id}`);
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  handleChange(event) {
+    this.setState({ [event.target.name]: event.target.value });
+  }
+
+  handleCancel() {
+    this.props.history.push(`/articles/${this.state.id}`);
+  }
+
+  render() {
+    return (
+      &lt;div>
+        &lt;h1>Edit {this.state.title}&lt;/h1>
+        &lt;form onSubmit={this.handleSubmit}>
+          &lt;div className="form-group">
+            &lt;label>Title&lt;/label>
+            &lt;input type="text" name="title" value={this.state.title} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="form-group">
+            &lt;label>Content&lt;/label>
+            &lt;textarea name="content" rows="5" value={this.state.content} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="btn-group">
+            &lt;button type="submit" className="btn btn-dark">Update&lt;/button>
+            &lt;button type="button" onClick={this.handleCancel} className="btn btn-secondary">Cancel&lt;/button>
+          &lt;/div>
+        &lt;/form>
+      &lt;/div>
+    );
+  }
+}
+
+export default ArticleEdit;
+</pre>
+<p>Save it, then edit a few articles to make sure it works.</p>
+<p>This component is mostly the same as the ArticleAdd component plus parts of the ArticleInfo component, so going through the code should reinforce what we covered earlier.</p>
+<p><b>The imports:</b></p>
+<pre>
+import React from 'react';
+import { get, patch } from 'axios'; #1
+</pre>
+<p>1) We import the <i>get</i> and <i>patch</i> methods from Axios. You could use <i>put</i> instead of <i>patch</i> since our Rails API routes them both to the same controller action.</p>
+
+<p><b>The ArticleEdit component constructor:</b></p>
+<pre>
+class ArticleEdit extends React.Component {
+  constructor() {
+    super();
+    this.state = { title: '', content: ''};            #1
+    this.handleChange = this.handleChange.bind(this);  #2
+    this.handleSubmit = this.handleSubmit.bind(this);
+    this.handleCancel = this.handleCancel.bind(this);
+  }
+</pre>
+<p>1) Set the initial state to an object with properties that align to the form fields, set to empty values. <br>
+2) Bind all the event handler functions. </p>
+
+<p><b>ComponentDidMount:</b></p>
+<pre>
+  componentDidMount() {                  #1
+    get(`http://localhost:3001/api/articles/${this.props.match.params.id}.json`) #2
+      .then((response) => {
+        this.setState(response.data);    #3
+      })
+      .catch(error => console.log('error', error));      
+  }
+</pre>
+<p>
+1) ComponentDidMount is a React lifecycle method. This method is identical to the one we have in ArticlesInfo. <br>
+2) We need to do an AJAX call to the API to get the data for the existing record. <br>
+3) Using promises, when we get the response we apply the setState method to change the state from the empty object we declared in the constructor, to the one from the database. 
+</p>
+
+<p><b>Render:</b></p>
+<pre>
+  render() {
+    return (                                    #1
+      &lt;div>
+        &lt;h1>Edit {this.state.title}&lt;/h1>        #2   
+        &lt;form onSubmit={this.handleSubmit}>     #3a
+          &lt;div className="form-group">
+            &lt;label>Title&lt;/label>
+            &lt;input type="text" name="title" value={this.state.title} onChange={this.handleChange} className="form-control" />     #4
+          &lt;/div>
+          &lt;div className="form-group">
+            &lt;label>Content&lt;/label>
+            &lt;textarea name="content" rows="5" value={this.state.content} onChange={this.handleChange} className="form-control" /> #5
+          &lt;/div>
+          &lt;div className="btn-group">
+            &lt;button type="submit" className="btn btn-dark">Update&lt;/button>   #3b
+            &lt;button type="button" onClick={this.handleCancel} className="btn btn-secondary">Cancel&lt;/button> #6
+          &lt;/div>
+        &lt;/form>
+      &lt;/div>
+    );
+  }
+</pre>
+<p>1) Our render method will return a JSX form block. <br>
+2) Start with an h1 element and insert the title from the current state. <br>
+3a&b) The form element has an onSubmit event that calls the handleSubmit handler function when the user clicks the submit button. <br>
+4&5) We have input and textarea elements. HTLM input elements are self-closing while textarea elements have opening and closing tags. React treats them both as self-closing elements. Both elements have a value attribute that is equal to the current state for title and content respectively. And they each have an onChange attribute that calls the handleChange handler function. <br>
+6) A cancel button calls the handleCancel handler function.</p>
+
+<p><b>HandleChange:</b></p>
+<pre>
+  handleChange(event) {                                         #1
+    this.setState({ [event.target.name]: event.target.value }); #2
+  }
+</pre>
+<p>1) The handleChange handler function is called every time the user types a character into one of the form fields. We are passing the event as the argument so we know which element to set the state for. <br>
+2) Set the state with the new value. If we only had one input, say for the title, then this line would be: <code>this.setState({ title: event.target.value });</code>. But since it's called from different form fields we need to pull the attribute name from the event object, as well as the value. 
+</p>
+
+<p><b>HandleSubmit:</b></p>
+<pre>
+  handleSubmit(event) {                                                           #1
+    event.preventDefault();                                                       #2
+    patch(`http://localhost:3001/api/articles/${this.state.id}.json`, this.state) #3
+      .then(() => {
+        this.props.history.push(`/articles/${this.state.id}`);                    #4
+      })
+      .catch(error => console.log('error', error));                               #5
+  }
+</pre>
+<p>1) When the user clicks the submit button in the form element, the onSubmit event calls the handleSubmit handler function. <br>
+2) When an HTML form is submitted, by default it tries to load a new page. But since our form is being submitted with AJAX we don't want a new page. So we call the preventDefault method on the event. <br>
+3) Send the AJAX request with the patch method to the endpoint url provided, sending the form data from this.state. <br>
+4) Using promises we wait from confirmation that the data was successfully received and saved, then call that article's ArticleInfo page. <br>
+5) If we instead get an error, we'll log it to the console.</p>
+
+<p><b>HandleCancel:</b></p>
+<pre>
+  handleCancel() {                                         #1
+    this.props.history.push(`/articles/${this.state.id}`); #2
+  }
+</pre>
+<p>1) If the user clicks the cancel button, the onClick event calls the handleCancel handler function. <br>
+2) Pushing the URL path with the current article id to the top of the history stack will trigger a redirect to that route, taking us back to the ArticleInfo page for that article.</p>
+
+<hr class="space">
+<!-- Foreman -->
+<h2 id='foreman'>Foreman <small>(Run the API and Client servers with one command)</small></h2>
+
+<p>Rather than changing into the client directory to start the React app, you can use the change-working-directory option to run it from the Rails product root directory like this: <code>yarn --cwd client start</code>. That still requires you to open two Terminal windows and start two separate servers. Instead, you can add the Foreman gem to run them both with one command. Foreman is a utility you call from the Terminal so you save it directly to your system, not though your Gemfile.</p>
+<li class='dlr'><code>gem install foreman</code></li>
+<p class="mt-3 mb-1">Then create a Procfile for your development environment and populate it with the below.</p>
+<li class="dlr"><code>touch Procfile.dev</code></li>
+<pre>
+# Procfile.dev
+web: cd client && PORT=3000 yarn start
+api: PORT=3001 && bundle exec rails s
+</pre>
+<p class='mt-3 mb-1'>By default Foreman looks for a file called Procfile to execute. The force option -f tells Foreman to use the provided file name instead. To start both servers run:</p>
+<li class="dlr"><code>foreman start -f Procfile.dev</code></li>
+
+<p class='mt-3 mb-1'>If you want to get even fancier you could create a rake task to execute Procfile.dev. For that you need to add the foreman gem to your Gemfile and specify the version (older versions don't recognize the cd command). At the time of this writing it was necessary to also specify the Thor dependency gem with version 0.19.1.</p>
+<pre>
+# Gemfile
+group :development do
+  gem 'foreman', '~> 0.85.0'
+  gem 'thor', '~> 0.19.1'
+end
+</pre>
+<li class="dlr"><code>bundle install</code></li>
+<p class='mt-3 mb-1'>Rails has a generator to add custom rake tasks. We'll call our task "start". Custom rake tasks are added to the lib/tasks folder. Our task file name will be start.rake.</p>
+<li class="dlr"><code>rails generate task start</code></li>
+<p class='mt-3 mb-1'>And Populate it with:</p>
+<pre>
+# lib/tasks/start.rake
+desc 'Start development servers'
+namespace :start do
+  exec 'foreman start -f Procfile.dev'
+end
+</pre>
+<p class='mt-3 mb-1'>Now we can start both servers with:</p>
+<li class="dlr"><code>rake start</code></li>
+
+<hr class="space">
+<p>We are done! We now have a fully functioning CRUD application with a Ruby on Rails API as the back end and a separate React application as the front end. Victory lap. <br>
+What's next? How about: <a href="react_redux_crud">Add Redux to our app</a>; <a href="rails_react_heroku">Deploy our app to Heroku</a>; <a href="rails_webpacker_react">Combine React with Rails using Webpacker</a></p>
+</div>
+
+<div id="disqus_thread"></div>
+<script>
+
+/**
+*  RECOMMENDED CONFIGURATION VARIABLES: EDIT AND UNCOMMENT THE SECTION BELOW TO INSERT DYNAMIC VALUES FROM YOUR PLATFORM OR CMS.
+*  LEARN WHY DEFINING THESE VARIABLES IS IMPORTANT: https://disqus.com/admin/universalcode/#configuration-variables*/
+/*
+var disqus_config = function () {
+this.page.url = PAGE_URL;  // Replace PAGE_URL with your page's canonical URL variable
+this.page.identifier = PAGE_IDENTIFIER; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
+};
+*/
+(function() { // DON'T EDIT BELOW THIS LINE
+var d = document, s = d.createElement('script');
+s.src = 'https://techandstartup.disqus.com/embed.js';
+s.setAttribute('data-timestamp', +new Date());
+(d.head || d.body).appendChild(s);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+
+</div>
+</body>
+</html>

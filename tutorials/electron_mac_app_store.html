@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>How to Release an Electron App on the Mac App Store</title>
+  <meta name="description" content="Steps needed to release an Electron app through the Mac App Store"> 
+  <meta name="keywords" content="Electron, Electron-builder, Mac App Store">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>How to Release an Electron App on the Mac App Store</h1>
+  <p>By Steve Carey - Last updated Apr 13, 2022. Originally published Feb 4, 2020.</p>
+  <p>Example Code: <a href="https://github.com/steve981cr/electron-quickstart-mas">Github</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<h2>Introduction</h2>
+<p>You have two options for distributing an Electron App for MacOS. Either directly (see <a href="https://kilianvalkhof.com/2019/electron/notarizing-your-electron-application/">Notarizing Your Electron Application</a>), or through the Mac App Store (MAS). All apps distributed though the MAS must be sandboxed, meaning they are completely self contained except for any approved entitlements. Below are the steps you need to take to get a basic app successfully submitted for review and approved for distribution on the Mac App Store.</p>
+
+<p>You will need to package two versions of your app. A development version for testing, and a distribution version for submission to Apple.</p>
+
+<p>Apple Reference: <a href="https://developer.apple.com/app-store/review/">developer.apple.com/app-store/review</a><br> 
+<a href="https://developer.apple.com/app-store/review/guidelines/">developer.apple.com/app-store/review/guidelines</a></p> 
+<p>Electron Reference: <a href="https://electronjs.org/docs/tutorial/mac-app-store-submission-guide">electronjs.org/docs/tutorial/mac-app-store-submission-guide</a></p>
+<p>Electron-builder Reference: <a href="https://www.electron.build/configuration/mac">electron.build/configuration/mac</a><br>
+<a href="https://www.electron.build/configuration/mas">electron.build/configuration/mas</a>
+</p>
+<hr>
+<h3>1) Starting with your completed Electron Application.</h3>
+<p>You have to use Electron version 8.0.2 or later (or patched versions 6.1.7 and 5.0.13) since earlier versions used private APIs which Apple no longer allows.
+</p>
+<p class='mb-1'>Electron should be a development (or global) dependency not a production dependency.</p>
+<li class="dlr"><code>npm install -D electron</code></li>
+
+<hr>
+<h3>2) Apple Developer Account </h3>
+<p>You need an Apple Developer Account. Costs ~$100/year. Sign up at <a href="https://developer.apple.com">developer.apple.com</a>.</p>
+
+<hr>
+<h3>3) Create Three Signing Certificates:</h3>
+<ul>
+  <li><b>Development:</b> used to sign apps for development and testing on machines that have been registered on the Apple Developer website.</li>
+  <li><b>Distribution:</b> used to sign apps submitted to the Mac App Store.</li>
+  <li><b>Mac Installer Distribution:</b> used to sign the Mac Installer Package in addition to the app itself.</li>
+</ul>
+
+<h4>Using XCode</h4>
+<p>Create and install these three certificates with XCode. Repeat the below process for each certificate.</p>
+<p>Open XCode > Click the XCode menu > Select Preferences > Click Accounts > Click the Manage Certificates button > Click the + button in the lower left corner > Select the certificate type to create (Development, Distribution, Mac Installer Distribution).</p>
+
+<h4>Using the Keychain Access app</h4>
+<p>Alternatively, you can create and install these three certificates with the Keychain Access app. Repeat the below two-step process for each certificate.</p>
+<h5>Step 1) Request a certificate:</h5>
+<li>Launch Keychain Access located in /Applications/Utilities.</li>
+<li>Click the Keychain Access menu > Certificate Assistant > Request a Certificate from a Certificate Authority. </li> 
+<li>In the Certificate Assistant dialog, enter an email address in the User Email Address field.  </li>
+<li>In the Common Name field use the value provided. </li>
+<li>Leave the CA Email Address field empty. </li>
+<li>Choose "Saved to disk" saving it to the desktop, and click Continue. Filename is CertificateSigningRequest.certSigningRequest </li>
+
+<br>
+<h5>Step 2) Import the new certificate from your developer account to your Keychain:</h5>
+<li>go to https://developer.apple.com/account > Certificates > + (to add a new certificate) > Select the certificate type (Apple Development, Apple Distribution, Mac Installer Distribution) > click the continue button > Choose File > Double-click the certificate file you downloaded above >  Download the new certificate file > Double click the downloaded file and it will be automatically loaded to your keychain.</li>  
+<li>Delete the CertificateSigningRequest.certSigningRequest and the certificate download files from the desktop.</li>
+  
+<br>
+<h4>To view the certificates: </h4>
+<li>To view the certificates in XCode: Open XCode > Click the XCode menu > Select Preferences > Click Accounts > If you have multiple apps select the relevant appleID and Team > Click the Manage Certificates button - This will show your list of certificates.</li>
+<li>To view the certificates in your keychain: Open the Keychain Access app in the Application Utilities folder > Click on the Login Keychain (should be selected by default) > Select Category: MyCertificates - this should display your certificates along with your Team Name and ID number. For a solo developer your team name is just your name.</li>
+<li>To view the certificates in you developer account go to developer.apple.com > Certificates, IDs, & Profiles menu > Certificates menu > Development, Distribution and Mac Installer Distribution type certificates should be listed there. Or go directly to https://developer.apple.com/account/resources/certificates/list</li>
+
+<hr>
+<h3>4) Create an App ID</h3>  
+<li>Go to your developer account - developer.apple.com > Certificates, IDs & Profiles > Identifiers > + (to add a new id) > select App IDs > continue button.</li>
+<li> On the Register App ID page:</li>
+<ul>
+  <li>Platform: MacOS </li>
+  <li>Bundle ID: Explicit. Apple recommends using a reverse-domain name style string (i.e., com.domainname.appname). This does not need to correspond with an actual website. This will need to match the appId property in the package.json file.</li>
+  <li>When done click continue, review it, then click register.</li>
+</ul>
+
+<hr>
+<h3>5) Add the App to your developer account</h3>
+Reference: <a href="https://help.apple.com/app-store-connect/">help.apple.com/app-store-connect</a> <br>
+Official instructions for adding an app: <a href="https://help.apple.com/app-store-connect/#/dev2cd126805">help.apple.com/app-store-connect/#/dev2cd126805</a>
+<li>Go to <a href="https://appstoreconnect.apple.com">appstore connect</a> </li>
+<li>Click on My Apps > + (to create a new app) > select New MacOS App > Select the appId you registered previously.</li>
+<li>Fill out the App Info section:</li>
+<ul>
+  <li>Enter the name you want your app to appear on the Mac App Store as. Two apps can't have the same name so your preferred app name may be taken.</li>
+  <li>Your app needs a privacy policy URL and (in another section) a support URL. </li>
+  <li>Select the appropriate category for your app. See <a href="https://developer.apple.com/app-store/categories/">Category list</a>.</li>
+  <li>Add a license agreement. You can use Apple's Standard License Agreement https://www.apple.com/legal/internet-services/itunes/dev/stdeula/</li>
+</ul>
+<li>Fill out the Pricing and Availability section:</li>
+<ul>
+  <li>Select the price you want to charge for your app. Be aware that Apple keeps 30%.</li>
+  <li>You can also select specific countries to make your app available in. Default is the whole world. </li>
+</ul>
+<li>Fill out the MacOS section:  </li>
+<ul>
+  <li>For marketing you can add up to 10 screenshots and up to 3 15-30 second videos. Be aware that these must be in specific dimensions. </li>
+  <li>The App Store Icon is taken from your app's icon.icns file so you don't need to upload them separately. </li>
+  <li>Enter the version number using semantic versioning (e.g., starting with 1.0.0).</li>
+  <li>If your app requires any entitlements enter them here along with the explanation as to why you need that entitlement. The app will be rejected if you request entitlements you don't need. See the Entitlements section below for details.  </li>
+  <li>Enter the support URL (required) and a marketing URL (optional).</li>
+  <li>When you upload your app (using the Transporter App - discussed below) you need to select it here. </li>
+  <li>You can add attachments that may be useful to the reviewer such as a video of how to use the app (can be any dimensions). </li>
+</ul>
+
+<hr>
+<h3>6) Create an icon set  </h3>
+Reference: <a href="https://www.electron.build/icons">electron.build/icons</a> | <a href="https://developer.apple.com/design/human-interface-guidelines/macos/icons-and-images/app-icon">developer.apple.com/design/human-interface-guidelines/macos/icons-and-images/app-icon</a>
+<li>You need to create your icon in at least two different sizes: 512x512 px and 1024x1024 px saved as png files. But ideally use all the Apple recommended sizes which additionally include 16x16, 32x32, 64x64, 128x128 and 256x256.</li>
+<li>Follow this guide: <a href="https://elliotekj.com/2014/05/27/how-to-create-high-resolution-icns-files/">How to create high resolution icns files</a>. A few things to highlight:</li>
+<ul>
+  <li>Make a folder called icon.iconset (or any name that has .iconset as the extension) to hold the images.</li>
+  <li>Use Apple's naming convention for the image files (e.g., icon_512x512.png, icon_512x512@2x.png, etc.).</li>
+  <li>The @2x files are double the size stated in terms of pixels. However in terms of display, Apple just doubles the density of the pixels instead of doubling the width and height. As such, some of the files will be the same image dimensions but two different files (e.g., icon_256x256@2x.png and icon_512x512.png are two separate files but are the same image size). If you are simplifying the images at smaller sizes, make sure the @2x image is the same as the 1x, just at double the size.</li>
+  <li>When you get down to the small sizes such as icon_16x16.png you'll likely need to simplify the image, otherwise it will just look blurry.</li>
+  <li>Convert the iconset into an icns file in the Terminal from the directory holding the icon.iconset folder with the png images. Enter the iconutil command:</li>
+  <li class="dlr"><code>iconutil -c icns icon.iconset</code></li>
+  <li>Put the resulting icon.icns file into the build folder of your electron project.</li>
+</ul>
+
+<hr>
+<h3>7) package.json file </h3>
+<h4>7a) Development version (for testing)</h4>
+<p>The values in italics need to be changed to your info.</p>
+<pre>
+{ 
+  "name": "<i>AppName</i>",  
+  "version": "1.0.0", 
+  ...
+  "author": "<i>AuthorName</i>", 
+  "build": {  
+    "appId": "<i>com.companyname.appname</i>",
+    "productName": "<i>App Name (can include spaces & special characters)</i>", 
+    "buildVersion": "<i>1.0.0</i>",
+    "copyright": "Copyright © 2022 <i>Developer or Company Name</i>",
+    "mac": {  
+      "category": "public.app-category.<i>categoryName</i>", 
+      "icon": "build/icon.icns",  
+      "target": "mas-dev",  
+      "hardenedRuntime": false, 
+      "entitlements": "build/entitlements.mas.plist", 
+      "entitlementsInherit": "build/entitlements.mas.inherit.plist",  
+      "provisioningProfile": "build/AppleDevelopment.provisionprofile",
+      "type": "development"
+    } 
+  }
+  "scripts": {
+    "postinstall": "electron-builder install-app-deps",
+    ...
+  },
+  ...
+}
+</pre>  
+
+<h4>7b) Distribution version (for submission to the Mac App Store)</h4>
+<p>The values in italics need to be changed to your info.</p>
+<pre>
+{ 
+  "name": "<i>AppName</i>",  
+  "version": "1.0.0", 
+  ...
+  "author": "<i>AuthorName</i>", 
+  "build": {  
+    "appId": "<i>com.companyname.appname</i>",
+    "productName": "<i>App Name (can include spaces & special characters)</i>", 
+    "buildVersion": "<i>1.0.0</i>",
+    "copyright": "Copyright © 2022 <i>Developer or Company Name</i>",
+    "mac": {  
+      "category": "public.app-category.<i>categoryName</i>", 
+      "icon": "build/icon.icns",  
+      "target": "mas",  
+      "hardenedRuntime": false, 
+      "entitlements": "build/entitlements.mas.plist", 
+      "entitlementsInherit": "build/entitlements.mas.inherit.plist",  
+      "provisioningProfile": "build/MacAppStore.provisionprofile"
+    } 
+  }
+  "scripts": {
+    "postinstall": "electron-builder install-app-deps",
+    ...
+  },
+  ...
+}
+</pre>  
+<p>Only include the postinstall script above if you have native dependencies that need to be recompiled by Electron (see section 13 below).</p>
+<b>Reference:</b>  
+<li>General configuration including metadata: <a href="https://www.electron.build/configuration/configuration">electron.build/configuration/configuration</a></li>
+<li>Mac-specific configuration: <a href="https://www.electron.build/configuration/mac">electron.build/configuration/mac</a></li>
+<li>MAS-specific configuration: <a href="https://www.electron.build/configuration/mas">electron.build/configuration/mas</a></li>
+
+<br>
+<b>A few things to note: </b>
+<li>Name and productName: The name key will be used as the display name for your app on the user's computer. It cannot contain spaces or special characters. If you want to use spaces or special characters in the name then add a productName key within the build key. You set the name of your app as it appears in the Mac App Store at appstoreconnect.apple.com. </li>
+<li>Version and build number: The version number in package.json should correspond with the version number of your app at appstoreconnect.apple.com. If you upload your app to appstoreconnect but decide to make changes before submitting it for review, you can't delete what you uploaded. Rather you submit a revised app with a different build number. Electron-builder sets the build number equal to the version number in the package.json file which is problematic if you need to submit a second build. To set a different build number, use the buildVersion property.</li>
+<li>Use the same appId as you created for your app at developer.apple.com.</li> 
+<li>The category key should align with the category you set for your app in appstoreconnect.apple.com. Mac uses this key in the Finder via View > Arrange by Application Category when viewing the Applications directory. <a href="https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/LaunchServicesKeys.html#//apple_ref/doc/uid/TP40009250-SW8">List of possible categories</a>.</li>
+<li>Set your target to "mas-dev" if building the development version (for testing) and "mas" if building the distribution version (to submit to the MAS).</li>
+<li>Set Hardened Runtime to false. You would set it to true if you want to distribute the app outside the MAS. For more on hardened runtime see <a href="https://developer.apple.com/documentation/security/hardened_runtime_entitlements">developer.apple.com/documentation/security/hardened_runtime_entitlements</a></li>
+<li>Set type to "development" for the development version.</li>
+
+<br>
+<b>Keys you don't need to set because the default is already correct:</b>  
+<li>The icon key points to where your icon.icns file is. The default folder and filename is build/icon.icns so you can leave it out if it is located there.</li> 
+<li>The type key can be distribution or development. Distribution is the default so you can leave this key out. </li>
+<li>The identity key sets the name of the certificate to use when signing. However, for the MAS build, the signing certificate will be taken from the provisioning profile (covered below). And Electron-builder will automatically use the 3rd Party Mac Developer Installer certificate in your Keychain to sign the pkg file.</li>
+<li>GatekeeperAssess key is set to false by default. Mac's Gatekeeper ensures that apps distributed outside the app store are signed and notarized. Since this build is for the MAS you can leave this at false.</li>
+
+<hr>
+<h3>8) Entitlements</h3>
+Reference: <a href="https://electronjs.org/docs/tutorial/mac-app-store-submission-guide">electronjs.org/docs/tutorial/mac-app-store-submission-guide</a> 
+<li>Make parent and child entitlement property list files using XML. Put them in the build folder.  </li>
+<li>These files correspond to the entitlements and entitlementsInherit keys in the package.json file. </li>
+<h4>The parent entitlement file: </h4>
+<b>/build/entitlements.mas.plist </b>
+<pre>
+&lt;?xml version="1.0" encoding="UTF-8"?>  
+&lt;!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">  
+&lt;plist version="1.0"> 
+  &lt;dict>  
+    &lt;key>com.apple.security.app-sandbox&lt;/key>&lt;true/>  
+    &lt;key>com.apple.security.application-groups&lt;/key>  
+    &lt;array> 
+      &lt;string><i>TEAM_ID.com.companyname.appname</i>&lt;/string>  
+    &lt;/array>  
+    &lt;!-- Put any entitlements your app requires here. Below is an example -->  
+    &lt;key>com.apple.security.files.user-selected.read-write&lt;/key>&lt;true/> 
+  &lt;/dict> 
+&lt;/plist>  
+</pre>
+
+<h4>Child entitlement file (inherits from the parent): </h4> 
+<b>/build/entitlements.mas.inherit.plist </b>
+<pre>
+&lt;?xml version="1.0" encoding="UTF-8"?>  
+&lt;!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">  
+&lt;plist version="1.0"> 
+  &lt;dict>  
+    &lt;key>com.apple.security.app-sandbox&lt;/key>&lt;true/>  
+    &lt;key>com.apple.security.inherit&lt;/key>&lt;true/>  
+  &lt;/dict> 
+&lt;/plist>  
+</pre>
+
+<li>First thing to notice is app-sandbox is set to true. All apps in the MAS must be sandboxed. That means they don't have access to resources outside the app, unless you specifically request an exception (an entitlement) and it is approved. For example to be able to read and write to files in the user's computer (outside the app) you need to request user-selected files read-write access. If approved your app can read/write files that users have specifically opened or saved using the mac Open or Save dialog box. </li>
+<li>These entitlements must correspond to the entitlements you request for your app in Appstoreconnect.apple.com  </li>
+<li>Read about entitlements <a href="https://developer.apple.com/library/archive/documentation/Miscellaneous/Reference/EntitlementKeyReference/Chapters/AboutEntitlements.html#//apple_ref/doc/uid/TP40011195-CH1-SW1">here</a>.</li>
+<li>The list of available app sandbox entitlement keys are <a href="https://developer.apple.com/library/archive/documentation/Miscellaneous/Reference/EntitlementKeyReference/Chapters/EnablingAppSandbox.html#//apple_ref/doc/uid/TP40011195-CH4-SW1">here</a>.</li>
+<li>The application-groups key is an array containing your app identifier (TeamID and appId). </li>
+
+
+<hr>
+<h3>9) Generate two Provisioning Profiles (AppleDevelopment and MacAppStore)</h3>
+<p>Repeat the below steps for Apple Development and Mac App Store</p>
+<li>Go to your apple developer account profiles page <a href="https://developer.apple.com/account/resources/profiles/list">developer.apple.com/account/resources/profiles/list</a></li>
+<li>Click the + sign to add a new profile which will take you to the "Register a New Provisioning Profile" page.</li> 
+<li>Select either macOS App Development or Mac App Store. Then click Continue.</li>
+<li>Select your appID and continue.</li>
+<li>Select your Mac App Distribution certificate and continue.  </li>
+<li>Give it a recognizable name like "AppleDevelopment" or "MacAppStore" then download it to your computer.</li> 
+<li>Double click the file to install it, then place it in the project's build directory. The file name would be AppleDevelopment.provisionprofile or MacAppStore.provisionprofile. This corresponds to the provisioningProfile key in the package.json file. Whatever you name it, during the build process it gets renamed to embedded.provisionprofile.</li> 
+<li>This is a binary file. If you want to read it's contents in XML format and you have X-Code's Command Line utilities installed, from the Terminal run the appropriate below command depending on the file name: </li>
+<li class="dlr"><code>security cms -D -i build/AppleDevelopment.provisionprofile</code></li>
+<li class="dlr"><code>security cms -D -i build/MacAppStore.provisionprofile</code></li>
+
+<hr>
+<h3>10) Build development and distribution versions the App with electron-builder</h3>
+<li>For building the app there are a few options. We will use the Electron-Builder package. Install it as a development dependency: </li>
+<span class="dlr"><code>npm install -D electron-builder</code></span>
+<li>Build the development version of the app using the development version of package.json, the AppleDevelopment.provisionprofile, and the Development signing certificate.</li>
+<span class="dlr"><code>electron-builder --mac</code></span>
+<li>After testing the Development version of the app, build the distribution version. Use the distribution version of package.json, the MacAppStore.provisionprofile, and the Distribution and Mac Installer Distribution signing certificates.</li>
+<span class="dlr"><code>electron-builder --mac</code></span>
+
+<hr>
+<h3>11) Test the app</h3>
+<p>Test the Development version of the app before building the distribution version. Make sure it works as expected.</p> 
+<p>Then build the distribution version. This version will crash and give you a signing error if you try to open it on your computer. It must be re-signed by Apple to be able to run, which will only be possible after being downloaded from the Mac App Store. However, there are some checks you can make before submitting it to Apple.</p>
+
+<li>You can test the signature if you have X-Code's CLI utilities installed. To check that your app is signed, go to the directory holding your app (e.g., MyApp/dist/mas) and enter the below command. If the app is signed it will display the details in the Terminal.</li>
+<li class="dlr"><code>codesign --display --verbose=2 <i>MyApp</i>.app</code></li>
+<li>To check that the .pkg file is signed enter the below command from the .pkg file's directory. If it is signed it will display the details in the Terminal.</li>
+<li class="dlr"><code>pkgutil --check-signature <i>MyApp</i>-1.0.0.pkg</code></li>
+<li>The Transporter app (see next section) has built-in checks on your app that will let you know about some (but not all) problems with your app. Simply load the app and send it to appstore connect. Don't worry, this doesn't submit it for review. That's a different step.</li>
+<li>If you are getting errors you could start by making sure all the basics are working by using this process on a simple Hello World Electron app. The Github example app link at the top is to such an app. Just add in your developer and app datails and provisioning profile.</li>
+
+
+<hr>
+<h3>12) Upload the pkg file</h3>
+<li>There are three different tools you can use to upload the pkg file: <a href="https://help.apple.com/app-store-connect/#/devb1c185036">help.apple.com/app-store-connect</a>.</li>
+<li>The <a href="https://apps.apple.com/us/app/transporter/id1450874784">Transporter app</a> can be downloaded free from the Mac App Store.</li>
+<li>Open the Transporter app > Drag and drop your Electron app's pkg file into the Transporter app > Deliver.</li>
+<li>If no errors it will send the app to your developer account.</li>  
+<li>Go to <a href="https://appstoreconnect.apple.com">appstoreconnect.apple.com</a> and click MyApps > Prepare for Submission > Build + icon > Select the uploaded file - Done </li>
+<li>Note: the build may have a "Missing Compliance" warning next to it. If so, when you submit the app you will be asked about any encryption in your app, so just answer the questions given.
+<li>If you are ready to submit then hit submit for review.</li> 
+<li>If you decide to make additional changes before submitting for review, you have to load another .pkg file through the Transporter app with a different build number.</li>
+
+<hr>
+<h3>13) Native Node NPM packages</h3>
+<p>If you installed one or more native node modules as a local dependency in your app such as Sqlite3 to use a sqlite database, you will need to make two modifications to the package.json file. Native node modules are npm packages that include C or C++ code.</p> 
+<p>First, to ensure your native dependencies match the electron version, add the below postinstall script.</p> 
+<p>Second, their executable file(s) need to be code signed in addition to the overall app and the .pkg file. This presents a problem for MAS builds. Apple can't read signatures inside the built binary app and will throw a code signing error if you try to open the packaged app. To solve this, unpack the native node dependencies by adding asarUnpack to the mac key in your package.json file.<br>
+Ref: <a href="https://www.electronjs.org/docs/tutorial/using-native-node-modules">Electron Docs: using native node modules</a>.</p>
+<pre>
+  "scripts": {
+    "postinstall": "electron-builder install-app-deps",
+    ...
+  },
+  "build": {
+    "mac": {
+      "asarUnpack": [
+        "**/*.node"
+      ],
+      ...
+    }
+  }
+</pre>
+<p>That will pull all node executable files (which have the extension .node) out of your app's binary file (called app.asar) and into a sibling folder called app.asar.unpacked. Apple can then read the dependency's signing certificate.</p>
+<p>After building the app you can confirm that the .node files are signed:</p>
+<li>Find the path to the .node executable file(s) in Finder by right clicking the built app in the dist/mas folder > Select "Show Package Contents" > Drill down to Contents/Resources/app.asar.unpacked/node_modules... until you find the executable file (ending in .node)</li>
+<li>In the Terminal cd to the built app: <span class="dlr"><code>cd dist/mas</code></span></li>
+<li>Run the XCode CLI command:<br>
+<span class="dlr"><code>codesign --display --verbose=2 <i>MyApp</i>.app/Contents/Resources/app.asar.unpacked/node_modules/<i>package_name/path/to/binary_file</i>.node</code></span><br>
+Sqlite3 example:<br>
+<span class="dlr"><code>codesign --display --verbose=2 <i>MyApp</i>.app/Contents/Resources/app.asar.unpacked/node_modules/sqlite3/lib/binding/napi-v3-darwin-x64/node_sqlite3.node</code></span>
+</li><br>
+
+<hr>
+<h3>Comments:</h3>
+<div id="disqus_thread"></div>
+<script>
+
+/**
+*  RECOMMENDED CONFIGURATION VARIABLES: EDIT AND UNCOMMENT THE SECTION BELOW TO INSERT DYNAMIC VALUES FROM YOUR PLATFORM OR CMS.
+*  LEARN WHY DEFINING THESE VARIABLES IS IMPORTANT: https://disqus.com/admin/universalcode/#configuration-variables*/
+
+var disqus_config = function () {
+this.page.url = "https://www.techandstartup.com/tutorials/release-electron-app-on-mac-app-store";  // Replace PAGE_URL with your page's canonical URL variable
+this.page.identifier = "electron_mac_app_store"; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
+};
+
+(function() { // DON'T EDIT BELOW THIS LINE
+var d = document, s = d.createElement('script');
+s.src = 'https://techandstartup.disqus.com/embed.js';
+s.setAttribute('data-timestamp', +new Date());
+(d.head || d.body).appendChild(s);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+
+</div>

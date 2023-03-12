@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>JWT Authentication with Rails and React</title>
+  <meta name="description" content="Tutorial on how to use JWT tokens for Authentication with Rails and React."> 
+  <meta name="keywords" content="React Authentication, Rails JWT tutorial, React JWT tutorial">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Authenticate React and Rails with JSON Web Tokens Tutorial</h1>
+  <p>Use JWT for Authentication with the Knock Gem for Ruby on Rails APIs</p>
+  <p>By Steve Carey - 8/8/2018</p>
+  <p>Final code: <a href="https://github.com/steve981cr/rails-react-jwt">Github</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<h2>Introduction</h2>
+<p>This is part of a series of tutorials on using React with Ruby on Rails. Each section is self-contained. In this section we will restrict access to our app by adding a User model to the Rails back end, a Log In page to the React front end, and use JSON Web Tokens for authentication.</p>
+<p>We will duplicate the app we built in previous tutorials of this series which consists of:</p>
+<li>A Ruby on Rails API. We will create an API-only app.</li>
+<li>A separate React client generated with the create-react-app package for quick setup.</li>
+<li>An "articles" resource and database table, with full CRUD capabilities.</li>
+To this we will add:
+<li>A User model with JWT authentication using the Knock gem. We are not using Devise which has it's own setup for working with JWTs.</li><br>
+
+<h2>JSON Web Tokens</h2>
+<p>In a traditional Ruby on Rails web application you would have a User model with a signup page. Then you would manage authentication with a login page that checks the user's username or email and password against the database. When the user is successfully logged in, their user id is added to the secured session cookie that Rails passes back and forth with the user's browser for each request-response cycle. That way you can restrict access to certain pages and actions to only registered users.</p> 
+<p>With an API this works the same except for the session cookie part. By definition the API server and the Client application are on different domains. In the app we are about to build, in development they will be on localhost:3001 and localhost:3000 respectively. Rails and other web frameworks have a same-origin policy where they won't send session cookies to another domain. It exposes the server to Cross-Site-Request-Forgery attacks. We need another solution. In this tutorial we will use JSON Web Tokens.</p>
+<p>A JSON Web Token or JWT (pronounced J-W-T or "jot") allows us to authenticate requests between the client and the server by encrypting authentication information into a compact JSON object called a token. Then that token can be included with HTTP requests that require authentication. Session cookies are automatically sent back and forth with every single request. JWTs on the other hand, must be specifically programmed to be included with a request, which you would do only when authentication is needed.</p>
+<p>A JWT consists of three strings separated by dots - the header, the payload, and the signature. </p>
+<ol>
+  <li>The header is encoded using base64. Uncoded, it lists the type of token, which is JWT, and the hashing algorithm used.</li>
+  <li>The payload, also called the JWT claims, contains the actual data concerning the user such as the User id. It also contains the expiration date. It is also encoded in Base64.</li>
+  <li>The signature is what makes the token tamper proof. It runs the encoded header, the encoded payload, and the secret through the hashing algorithm. For a Rails app the secret is its secret_key_base. Since only the server knows the secret, no one can tamper with the payload and the server can detect any tampering using the signature. </li>
+</ol>
+<p>Since the first two strings are encoded using Base64, they can be decoded. Later in this tutorial when we create JWTs, there is an online tool that can decode them so you can see the header and payload: <a href="https://jwt.io/">jwt.io</a>.</p>
+
+<hr class="space">
+<h3>Create a Rails API-only Application</h3>
+<p>We'll only give explanations for steps not covered in <a href="rails_api">Rails APIs Tutorial</a> of this series.</p>
+<p>Generate a new API-only application:</p>
+<li class="dlr"><code>mkdir rails-react-jwt; cd rails-react-jwt</code></li> 
+<li>If you are using RVM for Ruby and Gems version control you can set your gemset at this point.</li>
+<p class="dlr"><code>rails new . --api</code></p>
+<p>Generate an Articles scaffold which will give us a database migration file, a model, a JSON-api ready controller, and a route resource.</p>
+<li class="dlr"><code>rails generate scaffold Article title:string content:text</code></li>
+<p class="dlr"><code>rails db:migrate</code></p>
+<li>Add some seed data:</li>
+<pre>
+# db/seed.rb
+articles = Article.create([
+  {title: "Learn Ruby", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."},
+  {title: "Learn Rails", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."},
+  {title: "Learn React", content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."}
+])
+</pre>
+<p class="dlr"><code>rails db:seed</code></p>
+<p>Add the CORS gem to allow access to our API.</p>
+<pre>
+# Gemfile
+gem 'rack-cors'
+</pre>
+<li class="dlr"><code>bundle install</code></li>
+<pre>
+# config/initializers/cors.rb
+Rails.application.config.middleware.insert_before 0, Rack::Cors do
+  allow do
+    origins 'http://localhost:3000'
+
+    resource '*',
+      headers: :any,
+      methods: [:get, :post, :put, :patch, :delete, :options, :head]
+  end
+end
+</pre>
+<br>
+<p>This is the same API we build in part 1. Run the server and view the JSON data at http://localhost:3001/articles to make sure it's working so far.</p>
+<p class="dlr"><code>rails server -p 3001</code></p>
+
+<h4>User Model and Knock gem</h4>
+<p>Let's add two more gems. Bcrypt for password hashing and knock which is specifically for JWT authentication.</p>
+<pre>
+# Gemfile
+gem 'bcrypt', '~> 3.1.7'
+gem 'knock'
+</pre>
+<p class="dlr"><code>bundle install</code></p>
+<p>Generate the User scaffold:</p>
+<p class="dlr"><code>rails generate scaffold User name:string email:string password_digest:string admin:boolean</code></p>
+<p>Bcrypt will encrypt the password for us. You need to add "has_secure_password" to the User class. We'll add some validations too:</p>
+<pre>
+# app/models/user.rb 
+class User < ApplicationRecord
+  has_secure_password
+  validates :name, presence: true
+  validates :email, presence: true, uniqueness: { case_sensitive: false }
+end
+</pre>
+<p>The users controller generated by the scaffold gave us a field called password_digest, just like we told it to. But Bcrypt, in addition to hashing the password, it also turns password_digest into two fields: password and password_confirmation. So we need to change the permitted params from :password_digest to those two fields:</p>
+<pre>
+# users_controller.rb 
+def user_params
+  params.require(:user).permit(:name, :email, <b>:password, :password_confirmation,</b> :admin)
+end
+</pre>
+<p>In the migration file make the default value for admin false:</p>
+<pre>
+# db/migrate/<i>timestamp</i>_create_users.rb 
+...
+t.boolean :admin<b>, default: false</b>
+...
+</pre>
+<p>Now migrate the database:</p>
+<p class="dlr"><code>rails db:migrate</code></p>
+<p>Add some additional seed data with at least one admin and one non-admin, something like the below. <b class='dark-red'>Make sure to delete or comment out the articles seed data, otherwise it will add the same articles again!</b></p>
+<pre>
+# db/seeds.rb 
+User.create!(name: "Joey Ramone", email: "joey@ramones.com", password: "ramones", password_confirmation: "ramones", admin: true)
+User.create!(name: "Johnny Ramone", email: "johnny@ramones.com", password: "ramones", password_confirmation: "ramones")
+</pre>
+<p class="dlr"><code>rails db:seed</code></p>
+
+<h4>Configure Knock</h4>
+<p>We installed the Knock gem, now  we need to configure it to work with our User model. You can read more about knock on their <a href="https://github.com/nsarno/knock">Github page</a>.</p>
+<p>Run the install generator:</p>
+<p class="dlr"><code>rails generate knock:install</code></p>
+<p>This will create an initializer file at config/initializers/knock.rb that contains the default configuration. By default, Knock will expire the token in 24 hours. If you want to change that then uncomment the line and make the appropriate adjustments:</p>
+<pre>
+# config/initializers/knock.rb 
+config.token_lifetime = <b>1.day</b>
+</pre>
+<p>Generate a controller for users to sign in through: </p>
+<p class="dlr"><code>rails generate knock:token_controller user</code></p>
+<p>This generates a controller called user_token_controller. It inherits from Knock::AuthTokenController which comes with a create action that will create a JWT when a user successfully logs in. The generator also inserts a route in the routes.rb file: <code>post 'user_token' => 'user_token#create'</code> as an API endpoint for the client to call when logging in.</p>
+<p>Include the Knock::Authenticable module in your ApplicationController so you can add authentication before filters to to any of your controllers:</p>
+<pre>
+# app/controllers/application_controller.rb 
+class ApplicationController < ActionController::API
+  include Knock::Authenticable
+end
+</pre>
+<p>Add an <i>authenticate_user</i> before filter to the articles controller. And let's say we only want admin users to be able to delete articles. In that case you can wrap the @article.destroy statement in a conditional.</p>
+<pre>
+# app/controllers/articles_controller.rb 
+before_action :authenticate_user
+...
+def destroy
+  if current_user.admin?
+    @article.destroy
+  end
+end
+</pre>
+<p>Knock will add the User id to the JWT payload by default, assigned to a key called "sub." If you want to add any other information, you would add a method to the user model called to_token_payload and add it there. If you do that you need to also explicitly add <code>sub: id</code> or it won't be included. The below is just for reference and not needed in our app.</p>
+<pre>
+# app/models/user.rb 
+...
+def to_token_payload
+  {
+    sub: id,
+    name: name
+  }
+end
+</pre>
+<p>If you are using Rails 5.2 or higher you need to take two more steps. First, protect_from_forgery is included in ActionController::Base by default now, so you need to skip that in the Knock controller we generated for logging in from our React client. API clients are from a different domain so they won't have the standard Rails authenticity token.</p>
+<pre>
+# app/controllers/user_token_controller.rb
+class UserTokenController < Knock::AuthTokenController
+  <b>skip_before_action :verify_authenticity_token, raise: false</b>
+end  
+</pre>
+<p>The other change is Rails no longer uses config/secrets.yml to hold the secret_key_base that is used for various security features, including generating JWTs with the Knock gem. Rails now uses an encoded file called config/credentials.yml.enc. Add the below line to the Knock configuration file. If there is a line like this in the knock.rb file that is commented out, don't just uncomment it. Make sure it points to Rails.application.credentials and not Rails.application.secrets. The latter is for Rails 5.1 and earlier apps.</p>
+<pre>
+# config/initializers/knock.rb 
+...
+config.token_secret_signature_key = -> { Rails.application.credentials.fetch(:secret_key_base) }
+</pre>
+
+<h4>Add an api namespace using scopes</h4>
+<p>This time let's add an "api" scope to all of our api routes. That will add "api" to the path but not to the controller or model.</p>
+<pre>
+# config/routes.rb 
+scope '/api' do
+  post 'user_token' => 'user_token#create'
+  resources :users
+  resources :articles
+end
+</pre>
+<p>Now for example, once the user has been authenticated they would access the articles API with <code>http://localhost:3001/api/articles</code>.</p>
+
+<hr class="space">
+<h3>Test the User API</h3>
+<p>This is where an API testing app like Postman is useful. The Curl command line tool will also work but is less user friendly. Especially when you get an error since Rails will send back an HTML error page which is unreadable from the Terminal screen. If you don't have Postman and don't feel like spending an hour or more loading it and getting a feel for it, you can skip this step and go to the next section.</p>
+<p>In the tool, create a new user as a JSON string:</p>
+<pre>  
+Method: POST
+URL: http://localhost:3001/api/users
+Headers: Content-type: application/json
+Body:
+{
+  "user": {
+    "name": "DeeDee Ramone",
+    "email": "deedee@ramones.com",
+    "password": "ramones"
+  }
+}
+</pre>
+<p>Make sure to restart the server since we made some configuration changes.</p> 
+<p class="dlr"><code>rails server -p 3001</code></p>
+<p>If you send this request you should get a 201 successfully created response, and have a new User record in the database. You can see all the users in JSON format at <code>http://localhost:3001/api/users</code>. We won't make a sign up page in our app though. This is just to see if the API endpoint is working.</p>
+<p>We will, however, be requesting JSON Web Tokens from our React client as our log in process. We can test that the same way. We just change the URL and the body. </p>
+<pre>
+Method: POST 
+URL: http://localhost:3001/api/user_token
+Headers: Content-type: application/json
+Body:
+{
+  "auth": {
+    "email": "deedee@ramones.com",
+    "password": "ramones"
+  }
+}
+</pre>
+<p>Send this request. Knock will check the database for the email and password. If they match it will generate and return a JWT token which you should see in the response panel of the tool. If so, all is working as it should. On to React.</p>
+
+<hr class="space">
+<h2>Create the React Client</h2>
+<p>This user interface will be similar to the one from part 2 of this Rails-React series. We'll only explain what's different. Start by generating a separate React application using the create-react-app Node package. While you can put this anywhere, we'll put it in our Rails API app in it's own folder called "client."</p>
+<li class="dlr"><code>create-react-app client</code></li>
+<p class="dlr"><code>cd client</code></p>
+<p>Install the react-router and axios packages:</p>
+<p class="dlr"><code>yarn add react-router-dom axios</code></p>
+<p>It's a good idea to run the React App just to make sure it's working. We could do this with the <code>yarn start</code> command, but let's make things a little easier with the Foreman gem. 
+
+<h4>Foreman Gem</h4>
+<p>Right now we need to use two separate commands to start the Rails API server, and the React client server. The Foreman gem will let us do that with one command. Let's set that up. Per the <a href="https://github.com/ddollar/foreman">Foreman setup instructions</a>, don't add the gem to the Gemfile. Rather just install it directly on your system with <code>gem install foreman</code> (if you haven't installed it already).</p>
+<p>By default, when you issue the <code>foreman start</code> command it will look for instructions in a file called Procfile. That same file is used in production as well (Heroku uses Procfile in production). Since our server start commands won't apply to the production environment, let's create a Procfile specifically for the dev environment:</p>
+<p class="dlr"><code>touch Procfile.dev</code></p>
+<p>Populate it with the following:</p>
+<pre>
+# Procfile.dev 
+api: rails server -p 3001
+web: cd client && PORT=3000 npm start
+</pre>
+<p>The first line will start our rails API server on port 3001. The second line will cd into the client folder then start our React server on port 3000.</p>
+<p>Make sure to stop the Rails server you had running earlier. Now you can start both servers with one command:</p>
+<p class="dlr"><code>foreman start -f Procfile.dev</code></p>
+<p>The -f flag is forcing the use of the Procfile.dev file instead of the default Procfile.</p>
+<p>In your browser if you go to localhost:3000 you should see the Welcome to React default page. React is working. And the Rails API should also be running on port 3001. If you go to localhost:3001/api/articles you should get a 401 error because we restricted access in the controller. But if you go to http://localhost:3001/api/users you should see a JSON rendering of your Users since we didn't restrict access in the users controller (which we would in a production app).</p>
+
+<h4>Finish the React Setup</h4>
+<p>Lets add some structure to your React folders. From the "client" directory add the components, stylesheets, and images directories, move some of the default files, and add the component files that we'll populate later.</p>
+<pre>
+mkdir public/images
+mv public/favicon.ico public/images/favicon.ico
+mkdir src/stylesheets
+mkdir src/components
+rm src/logo.svg
+mv src/index.css src/stylesheets/index.css
+mv src/App.css src/stylesheets/App.css
+mv src/App.js src/components/App.jsx
+mv src/App.test.js src/components/App.test.js
+touch src/components/Home.jsx
+touch src/components/Login.jsx
+touch src/components/Logout.jsx
+touch src/components/ArticleList.jsx
+touch src/components/ArticleInfo.jsx
+touch src/components/ArticleAdd.jsx
+touch src/components/ArticleEdit.jsx
+</pre>
+<p>Fix the links to reflect the new folders and moved files:</p>
+<pre>
+# public/index.html 
+&lt;link rel="shortcut icon" href="%PUBLIC_URL%/<b>images/</b>favicon.ico">
+</pre>
+<pre>
+# src/index.js
+import './<b>stylesheets/</b>index.css';
+import App from './<b>components/</b>App';
+</pre>
+<p>Add the Bootstrap CDN to the index.css file for convenience.</p>
+<pre>
+# client/src/stylesheets/index.css 
+@import url('https://stackpath.bootstrapcdn.com/bootstrap/4.1.2/css/bootstrap.min.css');
+</pre>
+<p>In the package.json file add a proxy. This will allow us to use shortcuts in our api calls within our React code. So instead of calling 'http://localhost:3001/api/articles', you only need to call '/api/articles'. Make sure to add the comma before the preceding property name as shown below.</p>
+<pre>
+# package.json
+  ...
+  },
+  "proxy": {
+    "/api": {
+      "target": "http://localhost:3001"
+    }
+  }
+}
+</pre>
+
+<h4># src/components/App.jsx</h4>
+<p>Now let's set up the central component of our React client, the App.jsx file. This will hold our navigation bar and the custom element that will hold the content from each link. This is essentially the same as from our earlier app except we took the default header out and we're adding Login and Logout routes with corresponding components. Your code should look like this:</p>
+<pre>
+import React, { Component } from 'react';
+import '../stylesheets/App.css';
+import Home from './Home';
+import Login from './Login';
+import Logout from './Logout';
+import ArticleList from './ArticleList';
+import ArticleInfo from './ArticleInfo';
+import ArticleAdd from './ArticleAdd';
+import ArticleEdit from './ArticleEdit';
+import {BrowserRouter as Router, Route, NavLink, Switch} from 'react-router-dom'
+
+class App extends Component {
+  render() {
+    return (
+      &lt;Router>
+        &lt;div className="container">
+          &lt;Navigation />
+          &lt;Main />
+        &lt;/div>
+      &lt;/Router>
+    );
+  }
+}
+
+const Navigation = () => (
+  &lt;nav className="navbar navbar-expand-lg navbar-dark bg-dark">
+    &lt;ul className="navbar-nav mr-auto">
+      &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/">Home&lt;/NavLink>&lt;/li>
+      &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/articles">Articles&lt;/NavLink>&lt;/li>
+      {
+        localStorage.getItem("jwt") ?
+          &lt;li className="nav-item">&lt;NavLink exact className="nav-link" to="/logout">Log Out&lt;/NavLink>&lt;/li>
+        :
+          &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/login">Log In&lt;/NavLink>&lt;/li>
+      }
+    &lt;/ul>
+  &lt;/nav>
+);
+const Main = () => (
+  &lt;Switch>
+    &lt;Route exact path="/" component={Home} />
+    &lt;Route exact path="/login" component={Login} />
+    &lt;Route exact path="/logout" component={Logout} />
+    &lt;Route exact path="/articles" component={ArticleList} />
+    &lt;Route exact path="/articles/new" component={ArticleAdd} />
+    &lt;Route exact path="/articles/:id" component={ArticleInfo} />
+    &lt;Route exact path="/articles/:id/edit" component={ArticleEdit} />
+  &lt;/Switch>
+);
+
+export default App;
+</pre>
+<p>There is something funny going on in the Navigation component with the Log Out and Log In NavLinks. We'll get to that later.</p>
+
+<h4># src/components/Home.jsx</h4>
+<p>Populate the Home component:</p>
+<pre>
+# client/src/components/Home.jsx 
+import React from 'react';
+
+const Home = () => {
+  return (
+    &lt;div className="jumbotron">
+      &lt;h1>Home Page&lt;/h1>
+    &lt;/div>
+  );
+}
+
+export default Home;
+</pre>
+<p>You may need to restart the servers with foreman because of all the file changes: <code>Ctrl+C</code> to stop.</p>
+<p class="dlr"><code>foreman start -f Procfile.dev</code></p>
+<p>Now in http://localhost:3000 you should see the Home Page. None of the other links will work yet. Next we'll hook up the Log In page.</p>
+
+<h4># client/src/components/Login.jsx</h4>
+<p>Populate the Login.jsx file with:</p>
+<pre>
+import React, { Component } from 'react'
+import { post } from 'axios';
+
+class Login extends Component {
+  constructor() {
+    super()
+    this.handleSubmit = this.handleSubmit.bind(this);
+  }
+
+  handleSubmit (event) {
+    event.preventDefault();
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const request = {"auth": {"email": email, "password": password}};
+    post('/api/user_token', request)
+      .then(response => {
+        localStorage.setItem("jwt", response.data.jwt);
+        this.props.history.push("/");
+      })
+      .catch(error => console.log('error', error));
+  }      
+
+  render() {
+    return (
+      &lt;div>
+        &lt;h1>Log In&lt;/h1>
+        &lt;form onSubmit={this.handleSubmit}>
+          &lt;div className="form-group">
+            &lt;label htmlFor="email">Email: &lt;/label>
+            &lt;input name="email" id="email" type="email" className="form-control" />
+          &lt;/div>
+          &lt;div className="form-group">
+            &lt;label htmlFor="password">Password:&lt;/label>
+            &lt;input name="password" id="password" type="password" className="form-control" />
+          &lt;/div>
+          &lt;button type="submit" className="btn btn-dark">Submit&lt;/button>
+        &lt;/form>
+      &lt;/div>
+    );
+  }
+}
+
+export default Login;
+</pre>
+<p>Let's break down some of this code, starting with the render method:</p>
+<pre>
+render() {
+  return (
+    &lt;div>
+      &lt;h1>Log In&lt;/h1>
+      &lt;form onSubmit={this.handleSubmit}>                                                  #1a
+        &lt;div className="form-group">
+          &lt;label htmlFor="email">Email: &lt;/label>
+          &lt;input name="email" id="email" type="email" className="form-control" />          #2
+        &lt;/div>
+        &lt;div className="form-group">
+          &lt;label htmlFor="password">Password:&lt;/label>
+          &lt;input name="password" id="password" type="password" className="form-control" /> #3
+        &lt;/div>
+        &lt;button type="submit" className="btn btn-dark">Submit&lt;/button>                     #1b
+      &lt;/form>
+    &lt;/div>
+  );
+}
+</pre>
+<p>1) This is a React form. When the user clicks the submit button it triggers the onSubmit event which calls the handleSubmit handler function. <br>
+2&3) There are two form fields. We are approaching this form a little differently than we will with the article new and edit forms. Those use what React calls <a href="https://reactjs.org/docs/forms.html#controlled-components">controlled components</a> where the state of each form field is updated with every character typed. It requires a separate onChange attribute in the form fields that calls the handleChange function to setState with every keystroke. Here we are skipping the onChange event and just using the onSubmit event.</p>
+
+<p>The handleSubmit handler function is where we send the login form data to the API.</p>
+<pre>
+handleSubmit (event) {
+  event.preventDefault();                                            #1
+  const email = document.getElementById('email').value;              #2
+  const password = document.getElementById('password').value;        #3
+  const request = {"auth": {"email": email, "password": password}};  #4
+  post('/api/user_token', request)                                   #5
+    .then(response => {                                              #6
+      localStorage.setItem("jwt", response.data.jwt);                #7
+      this.props.history.push("/");                                  #8
+    })
+    .catch(error => console.log('error', error));                    #9
+}  
+</pre>
+<p>1) Since we are submitting a form we have to prevent the HTML default action which is to go to a new URL with the form data. Instead we are sending the from data via AJAX. <br>
+2&3) We added id attributes to the form fields. We use getElementById to get the form values. <br>
+4) Our API is using the Knock gem which will look to receive a login request with a property called "auth" set to an object containing the the log in form field names and values. If you want to see the request variable in the console at this point you can insert a <code>console.log(request);</code>. <br>
+5) We are using the Axios package for our AJAX calls. Earlier we added a proxy to the package.json file allowing us to use just the path instead of the full URL. You could still use the full URL if you wanted to. The path we are using is the specially created route for the Knock gem's log in process. It contains the form data in the "request" variable. <br>
+6) If the email and password match a user in the database, Knock will send back a JWT as part of the response's data string. If you want to view the response in the console you can insert a <code>console.log(response);</code>. <br>
+7) Once we get the JWT token we need to save it somewhere and send it with our requests. Two options are sessionStorage and localStorage. Whatever we put in sessionStorage will be stored in the browser until the user closes their browser. Then it is automatically erased. LocalStorage, on the other hand, will save it even after the user closes the browser. Which you use depends on how you want your app structured. By default, JWTs expire in 24 hours so it won't make much difference either way. But if you make your JWTs last much longer, then save the token in local storage, that will allow users to automatically be logged in whenever they visit your site. <br>
+8) We'll send the user to the home path when they log in. <br>
+9) In a real app you would want to give the user a useful message if there is an error when they log in. This is an introductory tutorial so we'll just log the error to the console.</p>
+
+<p>Axios is a React package that simplifies making AJAX calls. If you want to know how to make the request using the fetch API instead, you would replace the lines 5-9 with:</p>
+<pre>
+fetch('/api/user_token', {
+    method: 'POST',
+    body: JSON.stringify(request),     
+    headers: {'Content-Type': 'application/json' }
+  })
+  .then(response => response.json())
+  .then(data => {
+    localStorage.setItem("jwt", data.jwt);
+    this.props.history.push("/");
+  })
+  .catch(error => console.log('error', error));
+</pre>
+
+<h4># client/src/components/Logout.jsx</h4>
+<p>Populate the logout component:</p>
+<pre>
+import React from 'react';
+import { Redirect } from 'react-router-dom'
+
+const Logout = () => {
+  localStorage.removeItem('jwt');
+  return &lt;Redirect to='/' />
+}
+
+export default Logout;
+</pre>
+<p>It only does two things. <br>
+1) It removes the jwt item from localStorage (or sessionStorage if you put it there). <br>
+2) It uses React Router's Redirect component to redirect to the home path.</p>
+
+<p>Now let's revisit the Navigation component in the App.jsx file where something funny was going on. </p>
+<pre>
+const Navigation = () => (
+  &lt;nav className="navbar navbar-expand-lg navbar-dark bg-dark">
+    &lt;ul className="navbar-nav mr-auto">
+      &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/">Home&lt;/NavLink>&lt;/li>
+      &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/articles">Articles&lt;/NavLink>&lt;/li>
+      {                                                                                                     #1
+        localStorage.getItem("jwt") ?                                                                       #2 
+          &lt;li className="nav-item">&lt;NavLink exact className="nav-link" to="/logout">Log Out&lt;/NavLink>&lt;/li>  #3
+        :
+          &lt;li className="nav-item">&lt;NavLink exact className="nav-link" activeClassName="active" to="/login">Log In&lt;/NavLink>&lt;/li> #4
+      }
+    &lt;/ul>
+  &lt;/nav>
+);
+</pre>
+<p>This component is our navigation bar which contains the React Router package's NavLink elements. In addition to the Home and Articles links, we want to display either a Log In or Log Out link as determined through a conditional statement. This might seem like a good place for an if-else statement. And it is. Except you can't put if statements within JSX. Here's the details as to why in case you're curious: <a href="https://react-cn.github.io/react/tips/if-else-in-JSX.html">react tips</a>. But you can insert an expression in JSX including a ternary statement. A ternary statement is an if-else statement with short syntax: <code>condition ? if true : if false</code>. So we'll use that. <br>
+1) To include an expression in JSX, wrap it in curly braces. <br>
+2) Our ternary statement will start with the condition of whether there is a jwt object in localStorage (or sessionStorage if you are using that).<br>
+3) If there is, display the NavLink element to the Logout path. <br>
+4) If not, display the NavLink element to the Login path. 
+</p>
+
+<p>Let's try it out to see if it works. In your browser go to the Login page. Enter a user email and password (from the db/seeds.rb file). Log in and Log out a few times. Hopefully, this works! If you are curious to see your local storage, after you log in, open Chrome Developer Tools and click on the "Application" tab. On the left panel you'll see a section labeled Storage. There you can click on Local Storage (or Session Storage) and you should see the jwt key and it's value. Then if you are really curious you can decode it online at <a href="https://jwt.io/">jwt.io</a>.</p>
+
+<h4># client/src/components/ArticleList.jsx</h4>
+<p>Populate the Articles resource components starting with ArticleList. </p>
+<pre>
+import React, { Component } from 'react';
+import  axios  from 'axios';
+import { Link } from 'react-router-dom';
+
+class ArticleList extends Component {
+  constructor() {
+    super();
+    this.state = { articles: [] };
+  }
+
+  componentDidMount() {
+    let token = "Bearer " + localStorage.getItem("jwt");
+    axios({method: 'get', url: '/api/articles', headers: {'Authorization': token }})
+      .then(response => { 
+        this.setState({ articles: response.data })
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  render() {
+    return (
+      &lt;div>
+        {this.state.articles.map((article) => {
+          return(
+            &lt;div key={article.id}>
+              &lt;h2>&lt;Link to={`/articles/${article.id}`}>{article.title}&lt;/Link>&lt;/h2>
+              {article.content}
+              &lt;hr/>
+            &lt;/div>
+          )     
+        })}
+        &lt;Link to="/articles/new" className="btn btn-outline-primary">Create Article&lt;/Link>  
+      &lt;/div>
+    )
+  }
+}
+
+export default ArticleList;
+</pre>
+<p>Now in your browser if you click on the articles menu you should get the list of articles if you are logged in, and get nothing if you are logged out.</p>
+<p>This component is mostly the same as we created in Part 2 of this series. But this time, on the back end we restricted access to the Articles resource to only logged in users. So now when we make the AJAX request we need to send the JWT token in the request headers. Remember that unlike session cookies, JWT tokens are not sent automatically. We have to add them to the headers. </p>
+<pre>
+componentDidMount() {
+  let token = "Bearer " + localStorage.getItem("jwt");                              #1
+  axios({method: 'get', url: '/api/articles', headers: {'Authorization': token }})  #2
+    .then(response => {                                                             #3
+      this.setState({ articles: response.data })
+    })
+    .catch(error => console.log('error', error));
+}
+</pre>
+<p>1) Set a variable that gets the jwt string from localStorage (or sessionStorage). It should be in the format of "Bearer" then the string. <br>
+2) Use Axios to make the GET request. We must add the JWT to the request headers under the "Authorization" key. <br>
+3) Use ES6 promises to change the state for articles from an empty array to the response data when it is received.</p>
+<p>If you want to see what this would look like using Fetch instead of Axios, here it is:</p>
+<pre>
+componentDidMount() {
+  let token = "Bearer " + localStorage.getItem("jwt")
+  fetch('/api/articles', { method: 'GET', headers: {'Authorization': token }})
+    .then(response => response.json())
+    .then(data => {
+      this.setState({articles: data});
+    })
+    .catch(error => console.log('error', error));
+}
+</pre>
+
+<h4># client/src/components/ArticleInfo.jsx</h4>
+<p>Here's the ArticleInfo code:</p>
+<pre>
+import React, { Component } from 'react';
+import axios from 'axios';
+import { Link } from 'react-router-dom';
+
+class ArticleInfo extends Component {
+  constructor() {
+    super();
+    this.state = { article: {} };
+    this.handleDelete = this.handleDelete.bind(this);
+  }
+
+  componentDidMount() {
+    let token = "Bearer " + localStorage.getItem("jwt");
+    axios({method: 'get', url: `/api/articles/${this.props.match.params.id}`, headers: {'Authorization': token }})
+      .then((response) => { 
+        this.setState({
+          article: response.data
+        })
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  handleDelete() {
+    let token = "Bearer " + localStorage.getItem("jwt");
+    axios({ method: 'delete', url: `/api/articles/${this.props.match.params.id}`, headers: {'Authorization': token}})
+      .then(() => {
+        this.props.history.push("/articles")
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  render() {
+    return (
+      &lt;div>
+        &lt;h2>{this.state.article.id}: {this.state.article.title}&lt;/h2>
+        &lt;p>{this.state.article.content}&lt;/p>
+        &lt;p>
+          &lt;Link to={`/articles/${this.state.article.id}/edit`} className="btn btn-outline-dark">Edit&lt;/Link> 
+          &lt;button onClick={this.handleDelete} className="btn btn-outline-dark">Delete&lt;/button> 
+          &lt;Link to="/articles" className="btn btn-outline-dark">Close&lt;/Link>
+        &lt;/p>
+        &lt;hr/>
+      &lt;/div>
+    )
+  }
+}
+
+export default ArticleInfo;
+</pre>
+<p>Here we are also adding the JWT token to the request headers. In the Rails articles_controller we restricted article deletes to admin users. In a real application we would only display the delete button to admin users, but we'll keep it simple here and leave it as is. </p>
+
+<h4># client/src/components/ArticleAdd.jsx</h4>
+<p>Populate the ArticleAdd component:</p>
+<pre>
+import React, { Component } from 'react';
+import axios from 'axios';
+
+class ArticleAdd extends Component {
+  constructor() {
+    super();
+    this.state = { title: '', content: ''};
+    this.handleChange = this.handleChange.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this);
+    this.handleCancel = this.handleCancel.bind(this);
+  }
+
+  handleSubmit(event) {
+    event.preventDefault();
+    let token = "Bearer " + localStorage.getItem("jwt")
+    axios({ method: 'post', url: '/api/articles', headers: {'Authorization': token }, data: this.state})
+      .then((response) => {
+        this.props.history.push(`/articles/${response.data.id}`);
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  handleChange(event) {
+    this.setState({ [event.target.name]: event.target.value });
+  }
+
+  handleCancel() {
+    this.props.history.push("/articles");
+  }
+
+  render() {
+    return (
+      &lt;div>
+        &lt;h1>Create Article Post&lt;/h1>
+        &lt;form onSubmit={this.handleSubmit}>
+          &lt;div className="form-group">
+            &lt;label>Title&lt;/label>
+            &lt;input type="text" name="title" value={this.state.title} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="form-group">
+            &lt;label>Content&lt;/label>
+            &lt;textarea name="content" rows="5" value={this.state.content} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="btn-group">
+            &lt;button type="submit" className="btn btn-dark">Create&lt;/button>
+            &lt;button type="button" onClick={this.handleCancel} className="btn btn-secondary">Cancel&lt;/button>
+          &lt;/div>
+        &lt;/form>
+      &lt;/div>
+    );
+  }
+}
+
+export default ArticleAdd;
+</pre>
+
+<h4># client/src/components/ArticleEdit.jsx</h4>
+<p>And finally, populate the ArticleEdit component:</p>
+<pre>
+import React from 'react';
+import axios from 'axios';
+
+class ArticleEdit extends React.Component {
+  constructor() {
+    super();
+    this.state = { title: '', content: ''};
+    this.handleChange = this.handleChange.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this);
+    this.handleCancel = this.handleCancel.bind(this);
+  }
+
+  componentDidMount() {
+    let token = "Bearer " + localStorage.getItem("jwt");
+    axios({method: 'get', url: `/api/articles/${this.props.match.params.id}`, headers: {'Authorization': token }})
+      .then((response) => { 
+        this.setState(response.data)
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  handleSubmit(event) {
+    event.preventDefault();
+    let token = "Bearer " + localStorage.getItem("jwt")
+    axios({ method: 'patch', url: `/api/articles/${this.state.id}`, headers: {'Authorization': token }, data: this.state})
+      .then(() => {
+        this.props.history.push(`/articles/${this.state.id}`);
+      })
+      .catch(error => console.log('error', error));
+  }
+
+  handleChange(event) {
+    this.setState({ [event.target.name]: event.target.value });
+  }
+
+  handleCancel() {
+    this.props.history.push(`/articles/${this.state.id}`);
+  }
+
+  render() {
+    return (
+      &lt;div>
+        &lt;h1>Edit {this.state.title}&lt;/h1>
+        &lt;form onSubmit={this.handleSubmit}>
+          &lt;div className="form-group">
+            &lt;label>Title&lt;/label>
+            &lt;input type="text" name="title" value={this.state.title} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="form-group">
+            &lt;label>Content&lt;/label>
+            &lt;textarea name="content" rows="5" value={this.state.content} onChange={this.handleChange} className="form-control" />
+          &lt;/div>
+          &lt;div className="btn-group">
+            &lt;button type="submit" className="btn btn-dark">Update&lt;/button>
+            &lt;button type="button" onClick={this.handleCancel} className="btn btn-secondary">Cancel&lt;/button>
+          &lt;/div>
+        &lt;/form>
+      &lt;/div>
+    );
+  }
+}
+
+export default ArticleEdit;
+</pre>
+
+<p>Add, delete, and edit some articles. If you remove the <code>headers: {'Authorization': token }</code> from any of the requests you should see a 401 (Unauthorized) error in the console. If it all works (and it should), you now have basic authentication with JSON Web Tokens!</p>
+</div>
+
+</div>
+</body>
+</html>

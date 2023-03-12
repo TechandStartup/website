@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Redux with API Tutorial</title>
+  <meta name="description" content="Simple tutorial on how to use React and Redux with an API"> 
+  <meta name="keywords" content="React, Redux, Redux tutorial, Redux with API Tutorial, Redux with API example">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>The World's Simplest Redux with APIs Example</h1>
+  <p>A basic tutorial on how to make asynchonous API calls with React and Redux.</p>
+  <p>By Steve Carey - 8/22/2018</p>
+</div>
+
+<div class="slightly-shrink-font">
+<h2>Introduction</h2>
+<p>I really struggled getting a full understanding of using React and Redux with an API. All the examples I found were too complicated to know what is going on. Personally I like to start with the most basic example possible that still covers the main points. Once I understand that, then I can learn the other things by adding them on one at a time. Oddly enough I couldn't find a single tutorial that does that, so I made one. And here it is. The world's simplest Redux with APIs example.</p>
+<p>This app will do a GET request to an API and display the results. Simple as that. In the Advanced section of the official Redux documentation (<a href="https://redux.js.org/advanced">redux.js.org/advanced</a>) they show you how to build an asychronous application that requests Reddit posts on the topic of "reactjs" or "frontend." So we'll do that, only just for "reactjs." And if you've done the other <a href="rails_api">React with Rails tutorials</a> where we built a simple Rails API, you can use that too.</p>
+<p>This tutorial assumes only basic knowledge of Redux (you can do it even with no knowledge of Redux). It does assume you are reasonably familiar with React, ES6 syntax, and the concepts involved with API calls/asynchronous HTTP requests. For reference, React's docs show how to do an AJAX API call without Redux: <a href="https://reactjs.org/docs/faq-ajax.html">reactjs.org/docs/faq-ajax.html</a>. That example uses fetch (technically not AJAX but does the same thing) which we'll use in our second example. And it includes a "Loading..." spinner which we will exclude in our Redux examples.</p>
+<!-- <p>For our JavaScript functions we are generally using function expressions with ES6 arrow function syntax <code>const mapStateToProps = (state) => { return <i>stuff</i>; };</code> instead of function declarations <code>function mapStateToProps(state) { return <i>stuff</i>; }</code>. Either works but the placement is important. Function declarations are hoisted and function expressions are not so calling a function expression before it is defined will give you an error.
+</p> -->
+<p>Not that you need it with such a basic tutorial, but the finished code with both examples from this tutorial is on <a href="https://github.com/steve981cr/redux-apis-simplest-tutorial">Github</a>.</p>
+
+<hr class="space">
+<h2>About Redux</h2>
+<p>Redux is a light weight Node package that allows you to keep the current state of your application in one central object called store. Redux can be used on it's own without React. It is useful when React apps get large and start to become unweildy. Docs: <a href="https://redux.js.org/">redux.js.org/</a></p>
+<p>The key concepts of Redux are the store, actions and reducers. Plus the React-Redux package's connect method to hook it up to React. Below is an brief overview of each concept and it's main methods. If you are new to Redux, just reading them won't provide much understanding. Rather, we'll build the app using all these concepts, then analyze the code line by line.</p>
+<ul class="no-indent">
+  <li class="grow-font"><a href="https://redux.js.org/basics/store">Store</a></li>
+  <ul class="no-indent">
+    <li>The store is a single object that holds the current state of the application. Instead of setting and passing around state in the various components using props, state will be stored in one central location.</li>
+    <li>Create the store with the <a href="https://redux.js.org/api/createstore">createStore method</a> <code>const store = createStore(<i>reducer</i>)</code></li>
+  </ul>
+  <li class="grow-font"><a href="https://redux.js.org/basics/actions">Actions</a></li>
+  <ul class="no-indent">
+    <li>Actions are payloads of information that send data from your application to your store. They are the only source of information for the store.</li>
+    <li>You send action data to the store using <code>dispatch(<i>action</i>)</code>.</li>
+    <li>Actions are plain JavaScript objects. They must have a property named "type" that indicates the type of action being performed. </li>
+    <li>Types should typically be defined as string constants, although for small projects you could simply use string literals.</li>
+    <li>You can add other properties to the action object such as a payload property containing the data you want to update the store with.</li>
+    <li>Once your app is large enough, you may want to move your actions into a separate module.</li>
+    <li>Rather than defining the action object directly in the <code>dispatch(<i>action</i>)</code> method, you can create a separate action creation function.<br>
+    <code>const <i>functionName</i> = (<i>data</i>) => ({ type: <i>'TYPE_NAME'</i>, <i>payload: data</i>})</code></li>
+    <li>Then initiate a dispatch by passing the result to the dispatch() function: <code>dispatch(<i>functionName(data)</i>)</code></li>
+  </ul>
+  <li class="grow-font"><a href="https://redux.js.org/basics/reducers">Reducers</a></li>
+  <ul class="no-indent">
+    <li>The reducer is a user defined function that takes the previous state and an action as arguments, and returns the next state in the store object.</li>
+    <li>The function only works with the inputs provided to it. It does not get it's own inputs such as making API calls.</li>
+  </ul>
+  <li class="grow-font"><a href="https://redux.js.org/basics/usagewithreact">React-Redux</a></li>
+  <ul class="no-indent">
+    <li>Redux is not directly tied to React and can be used with other front-end libraries. The React-Redux package allows the React and Redux libraries to work together though its <b><a href="https://github.com/reduxjs/react-redux/blob/master/docs/api.md#api">connect()</a></b> function.</li>
+    <li>The connect function connects a React component to a Redux store. You pass it its built-in methods plus the component and it returns a new connected component.<br>
+    <code>connect(mapStateToProps, mapDispatchToProps)(<i>ComponentName</i>);</code></li>
+    <li>The built-in mapStateToProps method updates the component's props with the state from the Redux store every time the Redux store's state is changed.</li>
+    <li>The built-in mapDispatchToProps method or object adds any functions with action creators to the component's props so they can be called from inside the component.</li>
+    <li>The <a href="https://redux.js.org/basics/usagewithreact#passing-the-store">Provider component</a> makes the Redux store available to the connect() calls. Wrap your app's main component element with the Provider element setting the store attribute: <br>
+    <code>&lt;Provider store={store}>&lt;<i>MainComponent</i> />&lt;/Provider></code>
+    </li>
+  </ul>
+</ul>
+
+<hr class="space">
+<h2>Set up a React app with Redux</h2>
+<p>Use Create React App to set up a React app.</p>
+<li class="dlr"><code>create-react-app redux-apis-simplest-tutorial</code></li>
+<p class="dlr"><code>cd redux-apis-simplest-tutorial</code></p>
+Packages:
+<ul>
+  <li><b>Redux</b></li>
+  <li><b>React-Redux</b></li>
+  <li><b>Redux-Thunk</b>: Middleware that allows you to create asynchronous Redux actions that can wait for an API response. Docs: <a href="https://github.com/reduxjs/redux-thunk">github.com redux-thunk</a></li>
+  <li><b>Axios</b>: A React package to facilitate making API calls using AJAX. Docs: <a href="https://www.npmjs.com/package/axios">npmjs.com/package/axios</a></li>
+</ul>
+<p>Install the redux, react-redux, redux-thunk and axios packages:</p>
+<p class="dlr"><code>npm install --save redux react-redux redux-thunk axios</code> or <code>yarn add redux react-redux redux-thunk axios</code></p>
+<p>Run the server to make sure it's working:</p>
+<p class="dlr"><code>npm start</code> or <code>yarn start</code></p>
+<p>You should see the default Welcome to React app in your browser.</p>
+
+<h4>Build a basic React with Redux app that gets data from an API</h4>
+<p>First let's set up the file structure. We will just add a reducers.js file and remove some of the files we won't use.</p>
+<pre>
+touch src/reducers.js
+rm src/logo.svg
+rm src/App.test.js
+rm src/registerServiceWorker.js
+</pre>
+
+<p>That leaves us with three files for our code: index.js, App.js, and reducers.js, plus the css files. Go ahead and populate them first, then we'll break down the code.</p>
+
+<b>src/index.js</b>
+<pre>
+import React from 'react';
+import ReactDOM from 'react-dom';
+import { createStore, applyMiddleware } from 'redux';
+import thunk from 'redux-thunk';
+import rootReducer from './reducers';
+import { Provider } from 'react-redux';
+import './index.css';
+import App from './App';
+
+const store = createStore(rootReducer, applyMiddleware(thunk));
+
+ReactDOM.render(
+  &lt;Provider store={store}>
+    &lt;App />
+  &lt;/Provider>,
+  document.getElementById('root')
+);
+</pre>
+<b>src/App.js</b>
+<pre>
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import axios from 'axios';
+
+class App extends Component {
+  componentDidMount() {
+    this.props.getPosts();
+  }
+
+  render() {
+    return (
+      &lt;div>
+        &lt;h1>Reddit ReactJS Posts&lt;/h1>
+        &lt;ul>
+          {this.props.posts.map((post, index) =>
+            &lt;li key={index}>{post.title}&lt;/li>
+          )}
+        &lt;/ul>
+      &lt;/div>
+    );
+  }
+}
+
+const receivePosts = (json) => ({
+  type: 'RECEIVE_POSTS',
+  posts: json.data.children.map(child => child.data),
+});
+
+const getPosts = () => {
+  return (dispatch) => {
+    return axios.get('https://www.reddit.com/r/reactjs.json')
+      .then(response => {
+        console.log("response.data", response.data);
+        dispatch(receivePosts(response.data));
+      })
+      .catch(error => { 
+        throw(error); 
+      });
+  };
+};
+
+const mapStateToProps = (state) => ({ posts: state.posts });
+
+const mapDispatchToProps = { getPosts };
+
+export default connect(mapStateToProps, mapDispatchToProps)(App);
+</pre>
+
+<b>src/reducer.js</b>
+<pre>
+import { combineReducers } from 'redux';
+
+const posts = (state = [], action) => {
+  console.log("5.Reducer:action", action);
+  switch (action.type) {
+    case 'RECEIVE_POSTS':
+      return action.posts;
+    default:
+      return state;
+  }
+};
+
+export default combineReducers({ posts });
+</pre>
+<p>Now take a look in your browser. You should see list of Reddit article titles. So now we know it works.</p>
+
+<hr class="space">
+<h2>Code Breakdown</h2>
+<p>Now let's go over the code line by line, focusing mainly on what is different from using React without Redux.</p>
+<h4>src/App.js</h4>
+<pre>
+import React from 'react';
+import ReactDOM from 'react-dom';
+import { createStore, applyMiddleware } from 'redux';           //1a
+import thunk from 'redux-thunk';                                //1b
+import { Provider } from 'react-redux';                         //1c
+import rootReducer from './reducers';                           //1d
+import './stylesheets/index.css';
+import App from './components/App';
+​
+const store = createStore(rootReducer, applyMiddleware(thunk));  //2
+​
+ReactDOM.render(
+  &lt;Provider store={store}>                                       //3
+    &lt;App />
+  &lt;/Provider>,
+  document.getElementById('root')
+);
+</pre>
+<p>1a-d) These are Redux related imports. <br>
+1a) <a href="https://redux.js.org/api/createstore">CreateStore</a> is a built-in Redux method that creates a Redux store object. <a href="https://redux.js.org/api/applymiddleware">ApplyMiddleware</a> is another built-in Redux method that allows you to add middleware packages like Redux-Thunk. <br>
+1d) Import the reducer function. We're calling it rootReducer locally for this file, but any name will work. <br>
+2) Redux's createStore method creates the store object which will contain the current state of the application. It takes the reducer function as the first argument. CreateStore takes an optional argument for a store enhancer such as the applyMiddleware function that ships with Redux. Place the the middleware we are applying, Thunk, as the argument.<br>
+3) <a href="https://redux.js.org/basics/usagewithreact#passing-the-store">Provider</a> is a component from the React-Redux package. It makes the store available to all container components in the application without passing it explicitly. You only need to use it once when you render the root component.</p>
+
+<h4>src/App.js</h4>
+<p>For a small app like this it's okay to put the actions in with the component, but in a larger app you would want to put them into an action file. Also, Redux recommends splitting your components into two files, a presentational component that contains your JSX, and a container component that interacts with Redux. We are putting all these in our App.js file, but we'll use these groupings to break down the code.
+<h5>Container Component code</h5>
+<p>This is the component code that interacts directly with Redux using methods from the <a href="https://github.com/reduxjs/react-redux/blob/master/docs/api.md#connectmapstatetoprops-mapdispatchtoprops-mergeprops-options">React-Redux package</a>. If you are changing the state in your views then in the container code of your component you need use React-Redux's connect() function. To use connect() you need to define mapStateToProps or mapDispatchToProps or both.</p>
+<pre>
+const mapStateToProps = (state) => ({ posts: state.posts });       //1
+const mapDispatchToProps = { getPosts };                           //2
+export default connect(mapStateToProps, mapDispatchToProps)(App);  //3
+</pre>
+<p> 
+1) The mapStateToProps function is used with React-Redux's connect method. It is not required, but if we define it, then it will automatically be called any time the store is updated, or in Redux speak it will subscribe to Redux store updates.  The method returns a plain object which will be merged into the component's props. It takes the store's state as the first (and in this case only) parameter and updates the "posts" property from the store. Now any time the React component calls this.props.posts, it will have the most recent version from the Redux store object. <br><!-- Format: <code>mapStateToProps(state, [ownProps]): stateProps</code>. -->
+Note, for our functions we are generally using function expressions using ES6 arrow function syntax, but function declarations would also work. <!-- Here's an explanation of the difference: <a href="https://www.sitepoint.com/function-expressions-vs-declarations/">sitepoint.com/function-expressions-vs-declarations/</a> --><br>
+2) MapDispatchToProps is also used with React-Redux's connect method, and also not required. It can either be a function or an object. If an object is passed, as it is here, each function inside it (i.e., our getPosts function) is assumed to be a Redux action creator and will be merged with the component's props. <br>
+<!-- Format: <code>mapDispatchToProps(dispatch, [ownProps]): dispatchProps (Object or Function)</code>. -->
+3) The connect method connects the React component (i.e., App) to our Redux store. It takes in the special "connect" methods/objects we defined above as its arguments. We are also exporting the result. 
+<!-- Format: connect([mapStateToProps], [mapDispatchToProps], [mergeProps], [options]) -->
+</p>
+<h5>Presentational Component code</h5>
+<pre>
+class App extends Component {                      //1
+  componentDidMount() {                            //2
+    this.props.getPosts();                         //2a
+  }
+
+  render() {                                       //3
+    return (
+      &lt;div>
+        &lt;h1>Reddit ReactJS Posts&lt;/h1>
+        &lt;ul>
+          {this.props.posts.map((post, index) =>   //3a
+            &lt;li key={index}>{post.title}&lt;/li>      //3b
+          )}
+        &lt;/ul>
+      &lt;/div>
+    );
+  }
+}
+</pre>
+<p>
+1) Define a React <a href="https://reactjs.org/docs/components-and-props.html">class component</a>. <br>
+1b) There is no 1b. In a React class component without Redux you would set the initial state in a <a href="https://reactjs.org/docs/react-component.html#constructor">constructor function</a>. But since Redux manages state in the store object we don't need one. <br>
+Note on the order of 2 and 3. The render method will execute first. Then componentDidMount. Then after the API call is requested and received, the render method will execute again. So render() executes both before componentDidMount() and after.<br>
+2) The React <a href="https://reactjs.org/docs/react-component.html#componentdidmount">componentDidMount function</a> is invoked immediately after the component is mounted (inserted into the DOM tree).<br>
+2a) This is where we make the API call, or rather where we call the getPosts() function that makes the API call. <br>
+3) React's <a href="https://reactjs.org/docs/react-component.html#render">render method</a> is the only required method in a class component. It returns the JSX which will be converted to HTML. You can access this.props and this.state in expressions and render will include the value(s) with the JSX.<br>
+3a) We need to iterate over the Posts array (when we get it) using React's <a href="https://reactjs.org/docs/lists-and-keys.html">Lists and Keys process</a>. So we add an expression that looks in this.props for the posts array. If it's there we use the JavaScript map function to iterate over the array. <br>
+3b) React requires you to set a key based on a unique attribute. If each item in the list has an id attribute, that would be best. Here we are just using the array index number built into JavaScript arrays.
+</p>
+
+<h5>Action related functions</h5>
+<pre>
+const receivePosts = (json) => ({                                     //2
+  type: 'RECEIVE_POSTS',                                              //2a
+  posts: json.data.children.map(child => child.data),                 //2b
+});
+
+const getPosts = () => {                                              //1
+  return (dispatch) => {                                              //1a
+    return axios.get('https://www.reddit.com/r/reactjs.json')         //1b
+      .then(response => {                                             //1c
+        dispatch(receivePosts(response.data));                        //1d
+      })
+      .catch(error => { 
+        throw(error); 
+      });
+  };
+};
+</pre>
+<p>
+1) We added the getPosts method to the App component's props using mapDispatchToProps with the connect function. And we called getPosts() from the App component's componentDidMount method. Our getPosts method is where we make our API call. It uses ES6 Promises, the Axios package for AJAX, and a Redux action creator. <br>
+1a) You need to wrap the action creator into a dispatch call so it can be invoked directly. <br>
+1b) Send a get request to the URL. We are using the Axios package to handle the AJAX request behind the scenes. <br>
+1c) ES6 Promises will wait for the response before executing. It takes the response as the argument. <br>
+1d) When the response is received we need to add it to the store. Only an action object can change the store. Use the <a href="https://redux.js.org/api/store#dispatch-action">dispatch method</a> <code>dispatch(<i>action</i>)</code> to send the action to the reducer method, which will apply it to the store. <br>
+The argument for the dispatch method is the action. Instead of defining the action directly in the argument, we are calling a Redux <a href="https://redux.js.org/basics/actions#action-creators">action creation function</a>, defined above, passing the Response data as the argument. It returns the action. This is how Redux recommends doing it, although we could also just define the action directly in the dispatch method: <code>dispatch({type: 'RECEIVE_POSTS', posts: json.data.children.map(child => child.data)})</code>.<p>
+<p>2) Define the action creation function. This function just returns a Redux <a href="https://redux.js.org/basics/actions">action object</a>. It takes the data from the API call as the parameter. We're calling it "json" but you can use any name for the parameter.<br>
+2a) An action object must contain a "type" property. The value can be whatever name you find useful. Redux recommends using a string constant for the type's value, but you can also use a string literal like we are here. When the action is evaluated by the reducer function, you will generally use the "type" in an if or switch statement.<br>
+2b) If you need to send data to the store you can add a payload property of whatever name is useful, like "posts." When this method was called, the response.data from the API call was sent as the argument. To see what the response would look like in JSON format just paste <code>https://www.reddit.com/r/reactjs.json</code> into your browser. It's in a bit of a funky object within object format so we'll use the JavaScript map method to change it to a simple array of objects.
+</p>
+<p>Now the action object is sent to the Redux store. The Reducer function takes it from there.</p>
+
+<h4>src/reducer.js</h4>
+<pre>
+import { combineReducers } from 'redux';
+
+const posts = (state = [], action) => {     //1
+  switch (action.type) {                    //1a
+    case 'RECEIVE_POSTS':                   //1b
+      return action.posts;
+    default:                                //1c
+      return state;
+  }
+};
+
+export default combineReducers({ posts });  //2
+</pre>
+<p><a href="https://redux.js.org/basics/reducers">Reducer functions</a> change the value of the store based on the action sent to the store. In this case the RECEIVED_POSTS action sent the posts array to the store but it is the Reducer that applies it to the store. <br>
+1) Reducer functions are defined by the programmer and can be whatever name you want. Redux knows it is your reducer because you listed it as the first argument in createStore(<i>reducer</i>) in the src/index.js file. A reducer takes two arguments, the state (meaning the store's current state) and an action. The reducer needs to define an initial state. We are using the ES6 default state syntax to set the initial state to an empty array <code>state = []</code>. <br>
+1a) The reducer uses a switch statement (or if statement) to determine what to return to the store. Remember the action object's "type" property is required. We are using it in the switch statement. <br>
+1b) We sent the 'RECEIVE_POSTS' action, so in this case we will return the posts array that was sent as the argument. Redux will add the return value to the store. <br>
+1c) The reducer must have a default value. If there are no matches to the action type then we just return the current state back to the store. <br>
+2) While we only have one reducer, in most apps you will have more than one. Since there is only one Redux store object, the Redux combineReducers method will combine your reducers in an object when interacting with the store.
+</p>
+<p>When the store is updated that will trigger the mapStateStateToProps function, which in turn will trigger the render method which will display the posts to the User Interface.
+</p>
+<p>You are done! But, I find it helps to redo it with some variations. If you're up for it, on to the next section.</p>
+
+<hr class="space">
+<h2>Redo the App with some variations</h2>
+<p>Let's rebuild the app with some changes. In this version we will:</p>
+<ul>
+  <li>Point it to our own local API instead of Reddit's.</li>
+  <li>Use the native JavaScript Fetch API to make our API requests instead of the Axios package and AJAX.</li>
+  <li>Track the flow of our code through the console by:</li>
+  <ul>
+    <li>Adding the Redux Logger package to create a log in the console every time an action is called.</li>
+    <li>Add console log notes in our code.</li>
+  </ul>
+  <li>Convert the action types from string literals to string constants.</li>
+</ul>
+<p>Let's rebuild the app pointing to a different API. If you did the React with Rails tutorial series, or at least the <a href="rails_api">Building the Rails API</a> tutorial, then you have a simple Articles API built with Ruby on Rails that you can run locally on port 3001. Or build it with another framework like Node with Express and MongoDB or Python Django or whatever. You just need an endpoint at localhost:3001/articles that will return an array of JSON article objects with fields for id, title, and content. You could also just redo the Reddit api with these changes if you don't want to build your own API.</p>
+<p>Here is the code. You can either start a new app, or just replace the code in the app you created above. The differences are in bold. And this time the explanation will be on the flow following the console.log statements rather than the line by line details of the code.</p>
+
+<p>The first step is to add the <a href="https://github.com/evgenyrodionov/redux-logger">redux-logger package</a></p>
+<p class="dlr"><code>npm install --save redux-logger</code> or <code>yarn add redux-logger</code></p>
+
+<h4>src/index.js</h4>
+<pre>
+import React from 'react';
+import ReactDOM from 'react-dom';
+import { createStore, applyMiddleware} from 'redux';
+import thunk from 'redux-thunk';
+import rootReducer from './reducers';
+import { Provider } from 'react-redux';
+import './index.css';
+import App from './App';
+<b>import logger from 'redux-logger'</b>
+
+const store = createStore(rootReducer, applyMiddleware(thunk, <b>logger</b>));
+
+ReactDOM.render(
+  &lt;Provider store={store}>
+    &lt;App />
+  &lt;/Provider>,
+  document.getElementById('root')
+);
+</pre>
+<p>Import Redux-Logger and add it as an argument to the applyMiddleware method.</p>
+
+<h4>src/App.js</h4>
+<pre>
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
+
+// AppComponent.js
+class App extends Component {
+
+  componentDidMount() {
+    <b>console.log('3.this.props', this.props);</b>
+    this.props.getArticles();
+  }
+
+  render() {
+    <b>console.log("2.this.props.articles", this.props.articles);</b>
+    return (
+      &lt;div>
+        &lt;h1>Articles&lt;/h1>
+        &lt;ul>
+          {this.props.articles.map((article) => (
+            &lt;div key={article.id}>
+              &lt;hr />
+              &lt;h4>{article.id}: {article.title}&lt;/h4>
+              &lt;p>{article.content}&lt;/p>
+            &lt;/div>
+          ))}
+        &lt;/ul>
+      &lt;/div>
+    );
+  }
+}
+
+// actions.js
+<b>export const RECEIVE_ARTICLES = 'RECEIVE_ARTICLES';</b>
+const receiveArticles = (data) => ({
+  type: <b>RECEIVE_ARTICLES</b>,
+  articles: data,
+});
+
+const getArticles = () => {
+  return (dispatch) => {
+    return <b>fetch('http://localhost:3001/articles.json')
+      .then(response => response.json())
+      .then(data => {
+        <b>console.log("4.data", data);</b>
+        dispatch(receiveArticles(data));
+      })</b>
+      .catch(error => { 
+        throw(error); 
+      });
+  };
+};
+
+
+// App.js
+const mapStateToProps = (state) => {
+  <b>console.log("1.mapStateToProps:state", state);</b>
+  return {
+    articles: state.articles 
+  };
+};
+const mapDispatchToProps = { getArticles };
+
+export default connect(mapStateToProps, mapDispatchToProps)(App);
+</pre>
+<p>In the getArticles function, we are using the native JavaScript Fetch API to make our API call instead of using AJAX through the Axios package. This adds one more step of converting the response from a JSON string to JavaScript with the json() method. That step is done behind the scenes when using Axios.</p>
+<p>The Fetch API for asynchronous HTTP requests is an alternative to, and potentially replacement for AJAX. It is relatively new and only supported by the four major browsers since March 2017. But like all ES6 features, React will transpire it to ES5 using Babel.</p>
+<p>ReceiveArticles function is an action creation function. In our original example we set the type property's value to a string literal (in quotes) like this. <code>type: 'RECEIVE_POSTS'</code>. Redux recommends using a string constant for type values. So above it we declared a constant set to the string value and export it: <code>export const RECEIVE_ARTICLES = 'RECEIVE_ARTICLES';</code>. And we set the type to the constant <code>type: RECEIVE_ARTICLES</code> (without the quotes).</p>
+
+<h4>src/reducers.js</h4>
+<pre>
+import { combineReducers } from 'redux';
+<b>import { RECEIVE_ARTICLES } from './App';</b>
+
+const articles = (state = [], action) => {
+  switch (action.type) {
+    case <b>RECEIVE_ARTICLES</b>:
+      <b>console.log("5.Reducer:action", action);</b>
+      return action.articles;
+    default:
+      return state;
+  }
+};
+
+export default combineReducers({ articles });
+</pre>
+<p>Since we set the Action type to a constant in App.js and exported it, we are importing it in the Reducer. And in the case statement we use the constant (without quotes) instead of the string.</p>
+
+<h4>Run the new app</h4>
+<p>To see it in action make sure you go to the API's root directory and start the server on port 3001: <code>rails server -p 3001</code>.</p>
+<p>You may also need to restart the React app's server: <code>npm start</code> or <code>yarn start</code></p>
+<p>Then you should see the articles list in your browser. But this time we added the Redux Logger middleware and we added a bunch of console.logs in the code. So in the browser open up the console and refresh the page. This will show the progression of the app:</p>
+<ul style="list-style-type: none;">
+  <li><b>1.</b> The first thing that hits is the mapStateToProps function. We are returning the initial state which is an empty articles array.</li>
+  <li><b>2.</b> Then the render method hits. Initially the props only contain the empty articles array so nothing to display.</li>
+  <li><b>3.</b> Then after the component mounts, the componentDidMount() method automatically runs. At that point we can see that the App component's props contain the empty articles array set by the mapStateToProps method, and the getArticles function added by mapDispatchToProps.</li>
+  <li><b>4.</b> The componentDidMount method called the getArticles function. GetArticles() made the API call and using Promises received the data back from the API. We can see the data object contains an array with all our articles.</li>
+  <li><b>5.</b> In the Redux dispatch method we send the action to the store. From there the reducer evaluates it. We can see from the reducer function that the action object has a type property with value "RECIEVE_ARTICLES" and a payload property called articles that contains our array of articles. The reducer adds this to the store.</li>
+  <li><b>1.</b> When the store is updated the mapStateToProps method is automatically called. You can see the articles array is now in the props.</li>
+  <li><b>2.</b> The App component renders with the new Articles from the props.</li>
+</ul>
+<ul>
+  <li>In the console you can also see the Redux Logger has logged the RECEIVE_ARTICLES action. It shows the previous state with an empty articles array, the action, and the next state with the articles array populated.</li>
+</ul>
+<p>Okay, we are done. If you want to have more fun, you can add a REQUEST_ARTICLES action when the API request is made from the getArticles function, that displays a "Loading..." spinner until the API data has been received. Or go to the <a href="react_redux_crud">Redux CRUD App Tutorial</a> where we'll not only do an Articles API call, but we'll create, update and delete articles from our API as well. You don't want to miss that.</p>
+
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Build your own Ruby on Rails Tutorial</title>
+  <meta name="description" content="Learn Ruby and Rails by building your own simple web framework. Tutorial"> 
+  <meta name="keywords" content="Ruby on Rails, Web Framework Tutorial">
+  <link href="../images/favicon.ico" rel="icon" type="image/x-icon">
+  <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../stylesheets/style.css">
+  <script src="../javascripts/includes.js" defer></script>
+</head>
+  <body class="body-bg">
+    <header id="header"></header>
+    <div class="container">
+
+<div class="page-header">
+  <h1>Models and Persistence <small style="padding-left: 25px;">Build Your Own Rails - Part 5</small></h1>
+  <p>Learn Ruby and Rails by building your own very simplistic Rails-like Framework.</p>
+  <p><a href="build_rails_4 ">Back to Part 4</a> | <a href="build_rails_6">On to Part 6</a></p>
+</div>
+
+<div class="slightly-shrink-font">
+<h3>Definitions</h3>
+<p>We'll start by briefly defining seven terms and concepts: resources, database CRUD functions, HTTP methods, RESTful web architecture, the MVC model, active record architecture, and ORM.</p>
+<p><b>Resource:</b> A web resource is anything that can be obtained from the World Wide Web. Indeed the web address you type in your browser is called Uniform <i>Resource</i> Locator (URL). Rails uses the term <i>resource</i> more broadly to mean a RESTful resource, with a database table and the corresponding model, controller, and set of routes. We'll adopt that definition as well. In our Blog application we will create an Article resource that will include a database table called articles, a model class called Article, a controller class called ArticlesController, web page templates in an app/views/articles directory, and a set of articles routes. </p>
+<p><b>CRUD:</b> Most web applications need to persist data, generally by saving it to a database. On the database side this is often referred to as a CRUD (Create-Read-Update-Delete) application. In our database we will create a table called articles. This will give us the ability to <i>create</i> new articles (records) and save them in the database, <i>read</i> them from the database to display on our site, <i>update</i> and <i>delete</i> them.</p>
+<p><b>HTTP Methods:</b> The World Wide Web uses the Hypertext Transfer Protocol (HTTP) to exchange or transfer data (hypertext) between our users' computer/web browser (the client) and our website's server. HTTP methods POST, GET, PUT or PATCH, and DELETE correspond with the database CRUD functions. When a user enters a web address (url) in their browser it sends a GET request through the internet to our server to view a specific page. The page they request may or may not require data from a database. If it is to our articles page then our application will need to read from the articles database table to display a list of articles. If the user fills out a new article form and hits the submit button, their browser sends a POST request that sends the form data. Our application will take that POST request and create a new record in the database. A user can also send a request to update or delete an article, although those aren't necessarily done with HTTP PUT/PATCH and DELETE methods. Rails handles those with HTTP POST and GET requests respectively, along with a hidden form field indicating an update and a data attribute indicating a delete. The HTTP PUT method is to update an entire record with new data while the PATCH method is to update only specific fields.</p>
+<p><b>REST (REpresentational State Transfer):</b> REST is an architectural style for a web application. The term came from a 2000 Doctoral dissertation by Roy Fielding. A "RESTful" web application has a network of Web resources that the user progresses through by selecting links to perform GET, POST, PUT/PATCH, and DELETE operations. Each URL and operation represents a different state. Rails structures it's default REST architecture around a resource and seven routes and controller actions: index, show, new, edit, create, update, and destroy. Each of these represents a separate state. In a Rails application with an Article resource, a user can view an index page of all articles, view a show page of a specific article, access a new or edit form, create or update an article by submitting the form, and finally destroy an article with the delete button or link.</p>
+<p><b>Active Record Pattern:</b> Is a software architecture pattern for accessing data in a database from an object-oriented programming language (like Ruby). A database table is wrapped into a class. Each instance of that class is tied to a corresponding row in the database table. After creating an object of the class, a corresponding row is added to the table upon save. When accessing an existing object, that object gets it's information from the database. When updating an object, the corresponding row in the table is also updated. And when deleting an object, the corresponding database table's row is deleted. The wrapper class implements accessor methods or properties for each column in the table.</p>
+<p><b>Model:</b> The model is the part of the Model-View-Controller application architecture that represents the data. In Rails each resource is represented by a model. You instantiate an instance of the model class every time your application applies a RESTful action on a resource. When you create a new article, you instantiate an object (an instance) of the Article class. Your model then saves the object as a new record in your database following the Active Record Pattern, using an ORM library.</p>
+<p><b>ORM (Object-relational Mapping) library:</b> ORM is a technique that lets you interact with a database to perform CRUD operations from an object-oriented programming language. Our web application will have an Article resource. When a user submits a new article form, we instantiate a new article object in the model's Article class. Then we use an ORM library to save that object as a new record in our database. Rails is composed of ten separate but interconnected gems, one of which is an ORM library called ActiveRecord which Rails model classes inherit from. Since ActiveRecord is packaged as it's own gem, it can be used in non-Rails Ruby applications. Conversely, Rails applications can use an ORM library other than Active Record, such as the Sequel gem or the DataMapper gem.</p>
+<p>We will use a simple Active Record Pattern on our application and framework. For each resource our app will include a model file with a class named after it. The model classes will inherit from an ORM module in our Jails library that we'll call HacktiveRecord. We'll use a Sqlite database. And we'll employ a RESTful controller and set of routes and views around each resource. For our Blog application we will create an Article resource.</p>
+
+<hr class="space">
+<h3>File Structure</h3>
+<p>Create the file structure for our Article resource. That includes a controller, views, a model file, and some migration files to create the database and seed it with some articles. We already created a file in our Jails MVC framework library for simplistic ORM library <i>lib/jails/hacktive_record.rb</i>.</p>
+<pre>
+touch app/controllers/articles_controller.rb
+mkdir app/views/articles
+touch app/views/articles/edit.html.erb
+touch app/views/articles/index.html.erb
+touch app/views/articles/new.html.erb
+touch app/views/articles/show.html.erb
+touch app/models/article.rb
+touch db/migrate/001_create_articles.rb
+touch db/migrate/002_article_seeds.rb
+</pre>
+
+<hr class="space">
+<h3>Article objects</h3>
+<p>Like Rails, we will be using the Active Record Pattern for persisting instances of our resource <i>articles</i>. That entails instantiating article objects in memory from an Article class that correspond to records in an articles database table. So let's start with the in memory article objects without persistence.</p><br>
+
+<h4>Struct:</h4>
+<p>A Struct (short for structure) is a convenient way to bundle a number of attributes together, using accessor methods, without having to write an explicit class. Open IRB in the terminal <code>irb</code> and create a structure for articles and assign it to a constant.</p>
+<pre>
+Article = Struct.new(:id, :title, :content, :created_at)
+rack_article = Article.new(1, "Learn Rack", "Lorem Ipsum", Time.now)
+puts(rack_article)
+rack_article.title = "Learn Routes"
+rack_article.title
+object = Article.new(2, "Learn Models", "Lorem Ipsum", Time.now)
+puts(object)
+object.title
+</pre><br>
+
+<h4>Class:</h4>
+<p>Let's work with an Article class. Populate the article.rb file with an empty Article class.</p>
+<pre>
+<b># app/models/article.rb</b>
+class Article
+end
+</pre>
+<p>
+<p>Close then close your IRB session (Control+D) reopen IRB (<code>irb</code>) from the Blog project folder to clear out the Article constant. Load the article.rb file to get access to the class. Then instantiate a new Article object by calling the <i>new</i> method on the Article class. New is a special Ruby method, called a constructor, that creates a new object. We'll assign the object to a local variable called object1. You can't use dashes in variable names, <i>object-1</i> for example, because Ruby will try to subtract 1 from a variable named <i>object</i>. 
+<pre>
+load 'app/models/article.rb'
+object1 = Article.new
+</pre>
+This will create an Article object in you computer's RAM memory and return a string that shows the class name and an encoding of the object's id. But there is no way to add attributes to this object like id, title, content and created_at. If you tried <code>object1.id = 1</code> you would get an error saying the id method is undefined. We need to add Ruby getter and setter methods to the class to allow us to set specific attributes such as title, and get the attribute value back. Ruby has a shortcut method called attr_accessor. In the article.rb file, just below the Article class definition add this line:
+<code class="pre">attr_accessor(:id, :title, :content, :created_at)</code>
+Now we will be able to set and get values for the attribute symbols provided. The attribute will act like a method that we chain to the object. We'll start by reloading the article.rb file to have the changes available to us. <code>object1.id = 1</code> will set the object's id attribute value to 1, and <code>object1.id</code> will return the the id attribute's value. If we only wanted to give write access we would use <code>attr_writer</code> and for read-only access <code>attr_reader</code>. Now assign the following attributes to the object. For the <i>content</i> attribute, we'll just use the Lorem Ipsum filler text for the value. We'll call the <i>now</i> method on the <i>Time</i> class to get the current date and time. 
+</p>
+<pre>
+load 'app/models/article.rb'
+object1.id = 1
+object1.title = "Learn Controllers"
+object1.content = "Lorem Ipsum"
+object1.created_at = Time.now
+object1
+</pre>
+<p>Now if you enter <code>object1</code> you'll see that the object has all the attributes that you assigned it, set as instance variables.</p>
+<p>If we want to set the attributes at the same time we instantiate the object, then we need to define an initialize method in the class. Initialize is another special Ruby method. When you instantiate an object with <i>new</i>, Ruby will automatically call the <i>initialize</i> method. If there is no initialize method Ruby will create the object without it as we've seen. But if you want to set attributes or run methods when a new object is created, then you need to add an initialize method.</p>
+<p>In the Article class, below the attr_accessor method, define the initialize method. Add each attribute as an argument with default values (which can be nil or an empty string ''). But like all methods, you have to do something with the arguments that are passed in, otherwise they are ignored. Assigning the arguments to instance variables will make them object attributes.</p>
+<pre>
+def initialize(id: nil, title: nil, content: 'TBD', created_at: Time.now)
+  @id = id
+  @title = title
+  @content = content
+  @created_at = created_at
+end
+</pre>
+<p>Another way to do it is to use a splat parameter. That allows any number of arguments to be received. Then set the instance variables to the attribute key. We will send the arguments in a hash and the keys will be symbols.</p>
+<pre>
+def initialize(*attributes)
+  @id = :id
+  @title = :title
+  @content = :content
+  @created_at = Time.now
+end
+</pre>
+<p>And a third way to do it is to set a single parameter set to a hash that will hold the submitted attributes. We're using the || <i>or</i> operator to add a default in case the attribute key is not present.</p>
+<pre>
+def initialize(attributes = {})
+  @id = attributes[:id] || ''
+  @title = attributes[:title] || ''
+  @content = attributes[:content] || 'TBD'
+  @created_at = Time.now
+end
+</pre>
+<p>Reload the file using any one of the above formats and add a new record with a hash of attributes as the argument and you should see an object created with the attributes.</p>
+<pre>
+load 'app/models/article.rb'
+object2 = Article.new(id:2, title:"Learn Classes", content:"Lorem Ipsum")
+</pre>
+
+<p>Finally, lets add some methods to our class. Use the code below:</p> 
+<pre>
+<b># app/models/article.rb</b>
+class Article
+  attr_accessor(:id, :title, :content, :created_at)
+
+  def initialize(title: nil, content: 'TBD')
+    if defined?(@@article_count)
+      @@article_count += 1
+    else
+      @@article_count = 1
+    end   
+
+    @id = @@article_count
+    @title = titleize(title)
+    @content = content
+    @created_at = timestamp
+  end
+
+  def self.count
+    @@article_count
+  end
+
+  def timestamp
+    Time.now.to_s
+  end
+
+  def titleize(string)
+    do_not_capitalize = ["the","a","an","and","but","or","nor","for","of","to","at","by","from","in","on"] 
+    array = string.split.each do |word| 
+      if do_not_capitalize.include?(word.downcase)
+        word.downcase!
+      else
+        word.capitalize! 
+      end
+    end
+    array[0].capitalize + " " + array[1..-1].join(" ")
+  end
+
+  def to_s
+    title
+  end
+end
+</pre>
+<p>In the initialize method we'll declare a class variable called @@article_count that increments by 1 every time a new Article object is instantiated. Our conditional checks if the variable has been defined yet. If so it increments it by 1, and if not it defines it and sets it to 1. And we will use that variable to set the id value. We'll also create a class method called self.count that returns the @@article_count value. That is because class variables can't be accessed directly from outside the class, but a class method that returns the value can. Class variables and class methods are applied to the class and not to an instance of the class. Class methods begin with the keyword <i>self</i> which means the class itself. You could replace <i>self.count</i> with <i>Article.count</i> and it will work just the same.</p>
+<p>We'll create an instance method, meaning it is applied to a specific Article instance/object, called timestamp. This will return the current date and time and convert it to a string. We'll call that when setting the created_at attribute.</p> 
+<p>We'll define an instance method that will titleize a string, capitalizing the first letter of each word, less a provided word list. The first word in the title is always capitalized. We'll use that to titleize article titles when a new article is instantiated.</p>
+<p>The last instance method is an override of the Ruby to_s method when applied to an Article object. To_s converts the receiver object to a string. By default, when the object is called, Ruby returns a string that includes the class name, the encoded object id, and the attributes. But with this override, when an Article object is called with to_s it will return the title.</p>
+<p>Start a new session of IRB to clear the other objects from memory (Control+D <code>irb</code>). Load the article.rb file and create three objects. </p>
+
+<pre>
+load 'app/models/article.rb'
+object1 = Article.new(title: "learn controllers", content: "Lorem Ipsum")
+object2 = Article.new(title: "LEARN VIEWS", content: "Lorem Ipsum")
+object3 = Article.new(title: "learn modELS", content: "Lorem Ipsum")
+</pre>
+
+<p>You can modify the objects: 
+<code class="pre">object2.title = "Learn Routes"</code>
+<code class="pre">object2</code>
+The objects are stored in RAM memory and so you don't need to delete them. <br>
+You can call a class method to get the number of article objects:
+<code class="pre">Article.count</code>
+We overrode the to_s method so calling it will give you the object's title:
+<code class="pre">object2.to_s</code>
+The puts method will also return the object as a string <code>puts object2</code>.<br>
+</p>
+
+<hr class="space">
+<h3>Persisting Articles in a Database</h3>
+<p>There are two sides to the Active Record pattern. We just covered in-memory objects, now we'll cover persistence in a database. Like Rails we'll default to a SQLite database for development. It is light-weight and it actually gets embedded directly into our program. We placed it in the db folder. SQLite generally isn't used in production except for smaller applications. PostgreSQL and MySQL by contrast employ a client-server setup and are production ready. With Rails you can use those databases in production as well as development simply by adding the relevant gem to your gemfile and Rails will change the configuration. We won't be quite that automated, but you can apply this code to those databases as well with minimal modifications to the code.</p><br>
+
+<h4>sqlite3 Gem:</h4>
+<p>
+<b>Reference:</b> <a href="https://rubygems.org/gems/sqlite3">rubygems.org/gems/sqlite3</a> | <a href="http://www.rubydoc.info/gems/sqlite3/">Documentation</a><br>
+Sqlite3 is a library, packaged as a gem, that lets Ruby programs interface with the SQLite database engine. The SQLite database is currently on version 3, so this gem is compatible with that version. It provides methods for interacting with the database that we will use in our code.</p>
+
+<p>Add the sqlite3 gem:</p>
+<pre>
+<b># Gemfile</b>
+...
+# Allow Ruby programs to interface with the lightweight SQLite3 embedded database.
+gem "sqlite3"
+</pre>
+<p><code>bundle install</code></p><br>
+
+<h4>Create and Seed Database with Migration Files</h4>
+<p>Let's create a database and add an articles table to it with the necessary columns. We'll use a migration file to do it like Rails does. But unlike Rails, we don't have generators so we'll create it manually.</p>
+<p>We need to require sqlite3 to access it's Database class. The database file will be created in the db folder. The database name can be anything but we'll use the same name that Rails uses, development.sqlite3.</p>
+<p>Then we'll execute an SQL statement to create the table. If the database does not already exist, it will be created when the table is created. The SQL statement is in a multi-line string delimited with a <a href="https://ruby-doc.org/core-2.5.0/doc/syntax/literals_rdoc.html#label-Here+Documents">here document</a> <i>&lt;&lt;SQL...SQL</i>. Add the data type after the column name. TEXT data type is for large amounts of text. In SQLite VARCHAR(<i>n</i>) and TEXT are both treated as TEXT datatype. In MySQL VARCHAR(<i>n</i>) can hold up to 255 characters. In Postgresql VARCHAR(<i>n</i>) can hold up to the amount you specify.</p>
+<pre>
+<b># db/migrate/001_create_articles.rb</b>
+require 'sqlite3'
+
+# define db. If there is no db/development.sqlite3 it will be created. 
+db = SQLite3::Database.new(File.join("db", "development.sqlite3"))
+
+db.execute(&lt;&lt;SQL
+CREATE TABLE articles (
+id INTEGER PRIMARY KEY,
+title VARCHAR(255),
+content TEXT,
+created_at DATETIME DEFAULT NULL
+);
+SQL
+)
+
+# To run this: $ ruby db/migrate/001_create_articles.rb
+# To see if the db file is created in the db folder: $ ls db
+</pre>
+<p>Make sure you are out of IRB (Control+D or <code>exit</code>). Then run the migration from the terminal. <br>
+<code>ruby db/migrate/001_create_articles.rb</code><br>
+To see if the db file is created in the db folder, enter the UNIX list command for the db folder.<br>
+<code>ls db</code></p>
+
+<p>Now let's seed the database with some articles. Rails uses a db/seeds.rb file for all seeds. We'll vary from that and just make it another migration file.</p>
+
+<pre>
+<b># db/migrate/002_article_seeds.rb</b>
+require 'sqlite3'
+db = SQLite3::Database.new(File.join("db", "development.sqlite3"))
+db.execute(&lt;&lt;SQL
+INSERT INTO articles(title, content, created_at)
+VALUES('Learn Rack', 'Lorem Ipsum', CURRENT_TIMESTAMP),
+      ('Learn Models', 'Lorem Ipsum', CURRENT_TIMESTAMP);
+SQL
+)
+
+# To run this: $ ruby db/migrate/002_article_seeds.rb
+</pre>
+Then run the migration from the terminal.<br>
+<p><code>ruby db/migrate/002_article_seeds.rb</code></p><br>
+
+<h4>Sqlite Shell</h4>
+<p>The Sqlite3 gem provides a shell that you can also access from the terminal and run SQL statements on it directly. To confirm that sqlite3 is installed, call the version <code>sqlite3 --version</code>. <br>
+Then enter the shell and connect to the database:
+<code class="pre">sqlite3 db/development.sqlite3</code>
+Then you can enter your SQL statement(s) directly. Let's do a full series of CRUD database entries (Create, Read, Update, Delete) that will line up with our RESTful controller actions (new, create, index, show, edit, update, destroy).<br>
+First let's create a new article.
+<code class="pre">INSERT INTO articles (title, content, created_at) VALUES ('Learn SQL', 'Lorem Ipsum', CURRENT_TIMESTAMP);</code> 
+Next Read all all articles records. You should see the two records you created with the seed file migration, plus the record you just created in the shell.
+<code class="pre">SELECT * FROM articles;</code>
+Now read the article record with ID 3. We are adding a limit of 1 so the database stops looking after the first item is found.
+<code class="pre">SELECT * FROM articles WHERE id = 3 LIMIT 1;</code>
+Update the title of article id 3 to "Learn Storage", then read it to make sure it changed.
+<code class="pre">UPDATE articles SET title = 'Learn Storage' WHERE id = 3 LIMIT 1;</code>
+<code class="pre">SELECT * FROM articles WHERE id = 3 LIMIT 1;</code>
+Delete article 3.
+<code class="pre">DELETE FROM articles WHERE id = 3 LIMIT 1;</code>
+Now read all articles records and record 3 should be gone.
+<code class="pre">SELECT * FROM articles;</code>
+Exit the Sqlite3 shell with Control+D
+</p><br>
+
+<h4>Database commands from IRB</h4>
+<p>Let's enter the same type of SQL commands but using Ruby code in IRB. Enter the IRB shell <code>irb</code>. Then enter the commands below: </p>
+<pre>
+require "sqlite3"
+db = SQLite3::Database.new("db/development.sqlite3")
+db.execute("INSERT INTO articles (title, content, created_at) VALUES (?,?,CURRENT_TIMESTAMP);" 'Learn SQL', 'Lorem Ipsum')
+db.execute("SELECT * FROM articles;")
+db.execute("SELECT * FROM articles WHERE id = ? LIMIT 1;", 3)
+db.execute("UPDATE articles SET title = ? WHERE id = ?;", 'Learn ORM', 3)
+db.execute("SELECT * FROM articles WHERE id = ? LIMIT 1;", 3)
+db.execute("DELETE FROM articles WHERE id = ?;", 3)
+db.execute("SELECT * FROM articles;")
+</pre>
+<p>
+1) Require the sqlite3 gem. <br>
+2) Set a variable <i>db</i> to a new Sqlite database connection. <br>
+3-9) Chain Sqlite3's <a href="http://www.rubydoc.info/gems/sqlite3/SQLite3/Database#execute-instance_method">execute method</a> with the db connection as the receiver. The argument is a string containing the SQL statement you want to execute. Then perform the CRUD functions with SQL statements. Notice the SQL statement values have question mark placeholders, with the values given after the statement. This is called a prepared statement and the variables are called bind variables. Prepared statements are used to prevent SQL injection attacks where a malicious user enters SQL code in your forms to mess with your database. With the prepared statements the inputs are sanitized, meaning any SQL code is escaped before being sent to the database.
+</p>
+
+<hr class="space">
+<h3>The Article resource</h3>
+<p>Let's create an Article resource. We'll make it RESTful in the way Rails does, with seven routes and controller actions, and views to display all our articles, or a particular article, and forms to create and edit articles.
+
+<h4>Routes</h4>
+<p>Add the routes:</p>
+<pre>
+<b># config/routes.rb</b>
+...
+match("/articles", "articles#index")
+match("/articles/new", "articles#new")
+match("/articles/create", "articles#create")
+match("/articles/:id", "articles#show")
+match("/articles/:id/edit", "articles#edit")
+match("/articles/:id/update", "articles#update")
+match("/articles/:id/destroy", "articles#destroy")
+...
+</pre>
+
+<h4>Controller</h4>
+<p>Add the controller. The RESTful controller actions follow closely to the Rails default controller actions.</p>
+<pre>
+<b># app/controllers/articles_controller.rb</b>
+class ArticlesController < Controller
+
+  # GET /articles
+  def index
+    @articles = Article.all
+    render
+  end
+
+  # GET /articles/1
+  def show
+    @article = Article.find(params[:id])
+    render
+  end
+
+  # GET /articles/new
+  def new
+    render
+  end
+
+  # POST /articles/create
+  def create
+    @article = Article.new(title: params['article']['title'], content: params['article']['content'])
+    @article.save
+    redirect_to "/articles/#{@article.id}"
+  end
+
+  # GET /articles/1/edit
+  def edit
+    @article = Article.find(params[:id])
+    render
+  end
+
+  # PATCH /articles/1/update
+  def update
+    @article = Article.find(params[:id])
+    @article.update(title: params['article']['title'], content: params['article']['content'])
+    redirect_to "/articles/#{@article.id}"
+  end
+
+  # GET /articles/1/destroy
+  def destroy
+    @article = Article.find(params[:id])
+    @article.destroy
+    redirect_to("/articles")
+  end
+end
+</pre>
+
+<h4>Views</h4>
+<p>Add simple views.</p>
+<pre>
+<b># app/views/articles/index.html.erb</b>
+&lt;!DOCTYPE html>
+&lt;html>
+  &lt;%= render_partial("layouts/_head.html.erb") %>
+  &lt;body>
+    &lt;div id="container">
+      &lt;%= render_partial("layouts/_navbar.html.erb") %>
+      &lt;h1>Articles&lt;/h1>
+      &lt;p>
+        &lt;%= @articles.size %> Articles | 
+        &lt;a href="/articles/new">Create a new article&lt;/a>&lt;/p>
+      &lt;hr>      
+      &lt;% @articles.each do |article| %>
+        &lt;h3>&lt;a href="/articles/&lt;%= article.id %>">&lt;%= article.title %>&lt;/a>&lt;/h3>
+        &lt;div>&lt;%= article.content %>&lt;/div>
+        &lt;hr>
+      &lt;% end %>
+    &lt;/div>
+  &lt;/body>
+&lt;/html>
+</pre>
+
+<pre>
+<b># app/views/articles/show.html.erb</b>
+&lt;!DOCTYPE html>
+&lt;html>
+  &lt;%= render_partial("layouts/_head.html.erb") %>
+  &lt;body>
+    &lt;div id="container">
+      &lt;%= render_partial("layouts/_navbar.html.erb") %>
+      &lt;h1>&lt;%= @article.title %>&lt;/h1>
+      &lt;!-- Created_at date is saved in the database as a string. Convert it to a date object before formatting it. -->
+      &lt;p>&lt;%= DateTime.parse(@article.created_at).strftime("%b %d, %Y") if @article.created_at %>&lt;/p>
+      &lt;p>
+        &lt;a href="/articles">Back to the list&lt;/a> |
+        &lt;a href="/articles/&lt;%= @article.id %>/edit">Edit&lt;/a> |
+        &lt;a href="/articles/&lt;%= @article.id %>/destroy">Delete&lt;/a>
+      &lt;/p>
+      &lt;hr>
+      &lt;p>
+        &lt;%= @article.content %>
+      &lt;/p>
+    &lt;/div>
+  &lt;/body>
+&lt;/html>
+</pre>
+
+<pre>
+<b># app/views/articles.new.html.erb</b>
+&lt;!DOCTYPE html>
+&lt;html>
+  &lt;%= render_partial("layouts/_head.html.erb") %>
+  &lt;body>
+    &lt;div id="container">
+      &lt;%= render_partial("layouts/_navbar.html.erb") %>
+      &lt;h1>New Article&lt;/h1>
+      &lt;hr>
+      &lt;form action="/articles/create" method="POST">
+        &lt;div>
+          &lt;label for="title">Title&lt;/label>&lt;br>
+          &lt;input type="text" name="article[title]" id="title" autofocus>
+        &lt;/div>
+        &lt;div>
+          &lt;label for="content">Content&lt;/label>&lt;br>
+          &lt;textarea rows="10" name="article[content]" id="content">&lt;/textarea>
+        &lt;/div>
+        &lt;input type="submit" name="commit" value="Send">
+      &lt;/form>
+    &lt;/div>
+  &lt;/body>
+&lt;/html>
+</pre>
+
+<pre>
+<b># app/views/articles/edit.html.erb</b>
+&lt;!DOCTYPE html>
+&lt;html>
+  &lt;%= render_partial("layouts/_head.html.erb") %>
+  &lt;body>
+    &lt;div id="container">
+      &lt;%= render_partial("layouts/_navbar.html.erb") %>
+      &lt;h1>Edit Article&lt;/h1>
+      &lt;hr>
+      &lt;form action="/articles/&lt;%= @article.id %>/update" method="PATCH">
+        &lt;div>
+          &lt;label for="title">Title&lt;/label>&lt;br>
+          &lt;input type="text" name="article[title]" id="title" value="&lt;%= @article.title %>">
+        &lt;/div>
+        &lt;div>
+          &lt;label for="content">Content&lt;/label>&lt;br>
+          &lt;textarea rows="10" name="article[content]" id="content">&lt;%= @article.content %>&lt;/textarea>
+        &lt;/div>
+        &lt;input type="submit" name="commit" value="Send">
+      &lt;/form>
+    &lt;/div>
+  &lt;/body>
+&lt;/html>
+</pre>
+
+<hr class="space">
+<h3>Model and the ORM</h3>
+<p>Okay, now let's create our own simplified Object-Relational Mapping library for our application, and apply it to an articles resource. We'll set up our ORM so that it can be applied to any RESTful resource in our app. And when we separate our Jails framework code to a separate gem, it can be applied to other applications as well.</p>
+<p>We already created the database table and added some records. We also populated the model file, but let's modify it. We'll inherit from HacktiveRecord::Base. We can get rid of the @@article_count class variable since we can get our count from the database. We'll get rid of the titleize method but we'll see it again later.</p>
+<pre>
+<b># app/models/article.rb</b>
+class Article < HacktiveRecord::Base
+
+  # Getter and Setter methods for listed attributes.
+  attr_accessor(:id, :title, :content, :created_at)
+
+  # Set attributes when a new article object is instantiated.
+  def initialize(id: nil, title: nil, content: nil, created_at: timestamp)
+    @id = id
+    @title = title
+    @content = content
+    @created_at = created_at
+  end
+
+  # Return current date and time as a string.
+  def timestamp
+    Time.now.to_s
+  end
+  
+  # Return title when accessing object as string, overrides default: class, encoded object id and instance variables.
+  def to_s
+    title
+  end
+end
+</pre>
+<p>When initializing a new Article we need to get the current date and time for the created_at attribute. We define a timestamp method to do that, and convert it to a string so it can be saved in the database. When we want to read the created_at value, we define a created_at method to convert it back to a date object.</p><br>
+
+<p>The hactive_record.rb file will be our Framework's ORM, interacting with the database. This code can apply to any resource that follows the same RESTful structure as our Articles resource. We would simply create another model class such as Comment or User, and inherit from HacktiveRecord::Base. We are making HacktiveRecord a module to give it a separate namespace into which we could put multiple classes. We just have one class called Base, but we could break out different classes for different types of databases that Base would inherit from. One for SQLite, one for PostgreSQL, one for MySQL for example, but we'll keep it simple and not do that.</p>
+<pre>
+<b># lib/jails/hacktive_record.rb</b>
+require "sqlite3"
+
+# Simplistic ORM library using the Active Record pattern
+module HacktiveRecord
+  class Base
+    DB = SQLite3::Database.new("db/development.sqlite3")
+
+    # Return table name string by transforming the model class's name to lower case plural.
+    def self.table
+      table_name = self.name.downcase + "s"
+      return table_name
+    end
+
+    # Return array of DB column names converted to symbols.
+    def self.columns
+      columns = DB.table_info(table).map { |info| info["name"].to_sym }
+      return columns
+    end
+
+    # Return number of rows by executing a count query on the database for the resource.
+    def self.count
+      rows_count = DB.execute("SELECT COUNT(*) FROM #{table}")[0][0]
+      puts("\s #{self} SQL Statement: SELECT COUNT(*) FROM #{table}")
+      return rows_count
+    end
+
+    # Return array of all rows in queried from the database table, converted to objects of the resource.
+    def self.all
+      rows = DB.execute("SELECT * FROM #{table}")
+      puts("\s #{self} SQL Statement: SELECT * FROM #{table}")
+      objects = rows.map do |row|
+        attributes = Hash[columns.zip(row)]
+        self.new(attributes)
+      end
+      return objects
+    end
+
+    # Return an object by querying the database for the requested row searching by id.
+    def self.find(id)
+      row = DB.execute("SELECT * FROM #{table} WHERE id = ? LIMIT 1", id).first 
+      puts("\s #{self} SQL Statement: SELECT * FROM #{table} WHERE id = #{id} LIMIT 1")
+      attributes = Hash[columns.zip(row)]
+      object = self.new(attributes)
+      return object
+    end
+
+    # Save object as a new row to the database table, returning the object with the new attribute's id value.
+    def save
+      new_object = self
+      columns = new_object.class.columns
+      columns.delete(:id)
+      placeholders = (["?"] * (columns.size)).join(",") 
+      values = columns.map { |key| self.send(key) } 
+      columns = columns.join(",") 
+      DB.execute("INSERT INTO #{self.class.table} (#{columns}) VALUES (#{placeholders})", values)
+      puts("\s #{self.class} SQL Statement: INSERT INTO #{self.class.table} (#{columns}) VALUES (#{placeholders})" + values.to_s)
+      new_object.id = DB.execute("SELECT last_insert_rowid()")[0][0]
+      return new_object
+    end
+
+    # Modify row in database.
+    def update(attributes={})
+      columns = attributes.keys
+      columns = columns.map { |column| "#{column}=?" }.join(",")
+      values = attributes.values
+      values << id
+      DB.execute("UPDATE #{self.class.table} SET #{columns} WHERE id = ?", values)
+      puts("\s #{self.class} SQL Statement: UPDATE #{self.class.table} SET #{columns} WHERE id = ?" + values.to_s)
+    end
+
+    # Delete row from database.
+    def destroy
+      DB.execute("DELETE FROM #{self.class.table} WHERE id = ?", id)
+      puts("\s #{self.class} SQL Statement: DELETE FROM #{self.class.table} WHERE id = #{id}")
+    end
+  end
+end
+</pre><br>
+
+<p>Let's break it down:</p> 
+<p>We installed the sqlite3 gem, so at the top we will require it to access the SQLite3 module.
+<code class="pre">DB = SQLite3::Database.new("db/development.sqlite3")</code>
+At the top of our Base class declare a constant called DB that will instantiate a new connection to our database. SQLite embeds the database in our app, wherever we want to put it. We have a db folder so we put it there. We can name the database whatever we want, but we're calling it development.sqlite3.</p><br>
+
+<pre>
+def self.table
+  table_name = self.name.downcase + "s"
+  return table_name
+end
+</pre>
+<p>Our first method is a class method that returns the name of the table. It is derived from the class name (represented by the keyword <i>self</i>), put in lowercase letters and made plural by adding an s. This is convention over configuration. We won't get fancy and worry about irregular plurals like Person-people. If your class name is Article, your table name will be articles. </p><br>
+
+<pre>
+def self.columns
+  columns = DB.table_info(table).map { |info| info["name"].to_sym }
+  return columns
+end
+</pre>
+<p>The columns class method connects to the database, then calls the SQLite <a href="https://www.sqlite.org/pragma.html#pragma_table_info">table_info</a> method which returns information about each column including the column name. We apply the map method which will iterate through each item and apply a block to it, returning an array. In our block we'll take the "name" attribute from each column and convert it to a symbol. The columns method thus returns an array of all the column names from our table, converted to symbols.</p><br>
+
+<pre>
+def self.count
+  rows_count = DB.execute("SELECT COUNT(*) FROM #{table}")[0][0]
+  puts("\s #{self} SQL Statement: SELECT COUNT(*) FROM #{table}")
+  return rows_count
+end
+</pre>
+<p>The count class method will perform a database query and return the number of records for the table. And we'll log the SQL query to the terminal with a puts.</p><br>
+
+<b>All:</b>
+<p>When a user of our blog application clicks on the Articles link it goes to the /articles path. This is routed to the articles controller's index action.
+<pre>
+def index
+  @articles = Article.all
+  render
+end
+</pre>
+This calls the <i>all</i> method from our model's Article class (defined in our app/models/article.rb file). Except it's not defined in the Article class, it's defined in the HacktiveRecord::Base class which Article inherits from. But it works the same as if it was defined directly in the Article class, as do all the constants and methods defined there. Notice <i>Article</i> is the receiver of the <i>all</i> method. Article is a class so the <i>all</i> method is a class method prefaced with the keyword <i>self</i>.</p>
+<pre>
+def self.all
+  rows = DB.execute("SELECT * FROM #{table}")               # 1
+  puts("\s #{self} SQL Statement: SELECT * FROM #{table}")  # 2
+  objects = rows.map do |row|                               # 3
+    attributes = Hash[columns.zip(row)]
+    self.new(attributes)
+  end
+  return objects                                            # 7
+end
+</pre>
+<p> 
+1) Execute a database query to get all the rows from our table. Each row contains an array of values from an individual article. <br>
+2) Log the SQL statement to the terminal using puts. <br>
+3-6) Use a block to convert the row values into Ruby objects. The map method returns an array of objects, one for each article. To get an object we use the zip method from the Hash class. It combines the array of columns that we get from the columns method, with the array of row values, giving us key value pairs. Then we call the new method on <i>self</i> (self representing Article), which creates a new Article object. <br>
+7) Return the array of article objects.</p>
+<p>So the Article.all method call returned an array of objects for all the articles in the database. This was assigned in the controller to the @articles instance variable. Then on the index.html.erb view page, @articles is accessed to iterate over each article object:</p>
+<pre>
+&lt;% @articles.each do |article| %>
+  &lt;h3>&lt;a href="/articles/&lt;%= article.id %>">&lt;%= article.title %>&lt;/a>&lt;/h3>
+  &lt;div>&lt;%= article.content %>&lt;/div>
+  &lt;hr>
+&lt;% end %>
+</pre><br>
+
+<b>Find:</b>
+<p>There are a number of controller actions that need to work with a specific article including show, edit, update, and destroy. They call the find method to return an article object and assign it to the @article instance variable like so:
+<code class="pre">@article = Article.find(params[:id])</code>
+Notice that the class Article is the receiver of the find method. It seems counterintuitive, but find is a class method not an instance method. That's because when you call it, you don't yet have the object. That's the task of the find method. To return the requested article object.
+</p>
+<p>The find method is called on the model's Article class, but it is defined in the inherited HacktiveRecord::Base class:</p>
+<pre>
+def self.find(id)
+  row = DB.execute("SELECT * FROM #{table} WHERE id = ? LIMIT 1", id).first          # 1
+  puts("\s #{self} SQL Statement: SELECT * FROM #{table} WHERE id = #{id} LIMIT 1")  # 2
+  attributes = Hash[columns.zip(row)]                                                # 3
+  object = self.new(attributes)                                                      # 4
+  return object
+end
+</pre>
+<p>
+1) The first statement is a database query looking for a row with the id value passed in. We add a limit of 1 so the database stops looking once it finds one row. It returns an array of the row's values for id, title, content, and created_at. It actually returns an array of arrays. The outer array contains one element for each row. We tack on the Ruby <i>first</i> method which returns the first element in the array, which works out great since we only have one element in the outer array. <br>
+2) Print the query to our logs with puts. <br>
+3) Get a hash of the attributes by zipping the row values to the columns, which become the hash keys. <br>
+4-5) Call the new method on <i>self</i> (i.e., the Article class) to instantiate and return a new Article object based on the attributes we got from our database query.</p><br>
+
+<b>Create:</b>
+<p>When a user wants to create a new article they click on the new article link. That presents a page with a form to fill out. When they submit the form it sends a POST request with the form data that gets routed to the controller's create action:</p>
+<pre>
+def create
+  @article = Article.new(title: params['article']['title'], content: params['article']['content'])
+  @article.save
+  redirect_to "/articles/#{@article.id}"
+end
+</pre>
+<p>There are three distinct things going on in this controller action. The first statement creates a new article object. The second statement saves the object to the database. The third object gets the new article id and uses it to redirect to the new article's show page.</p>
+<p>The first statement uses the Ruby new method on the Article class to create a new article object. It sends the title and content values as arguments. The values come from the POST data's params as submitted by the article form. Just as we created new articles from IRB, the Article class will instantiate a new Article object:</p>
+<pre>
+class Article < HacktiveRecord::Base
+  attr_accessor(:id, :title, :content, :created_at)
+
+  def initialize(id: nil, title: nil, content: nil, created_at: timestamp)
+    @id = id
+    @title = title
+    @content = content
+    @created_at = created_at
+  end
+
+  def timestamp
+    Time.now.to_s
+  end
+  ...
+end
+</pre>
+<p>The new object will have an id of nil, a title and content as submitted in the form, and a created_at date as generated from the timestamp method. We assign this object to the @article instance variable.</p>
+<p>The second statement in the articles controller index action saves the @article object, which is currently in our computer's RAM memory as a Ruby object, to our database. It calls the save method on the object so this is an instance method, defined in HacktiveRecord::Base.</p>
+<pre>
+def save
+  object = self                                              # 1
+  columns = object.class.columns                             # 2
+  columns.delete(:id)                                        # 3
+  placeholders = (["?"] * (columns.size)).join(",")          # 4
+  values = columns.map { |key| object.send(key) }            # 5
+  columns = columns.join(",")                                # 6
+  DB.execute("INSERT INTO #{object.class.table} (#{columns}) VALUES (#{placeholders})", values)  # 7
+  puts("\s #{self.class} SQL Statement: INSERT INTO #{self.class.table} (#{columns}) VALUES (#{placeholders})" + values.to_s) # 9
+  object.id = DB.execute("SELECT last_insert_rowid()")[0][0] # 10
+  return object
+end
+</pre>
+<p>
+  1) The first statement is just a convenience so that it's clear that <i>self</i> represents the new Article object that was assigned to @article in the controller. It is the receiver of the save method.<br>
+  2) Chain the "class" method to the new article object to get it's class, then call the columns class method to get an array of the database column names. <br>
+  3) Remove the id column since we don't have an id for our object yet. <br>
+  4) Return a string of one question mark for each column separated by commas. We will be using a prepared statement for our database insert, which uses ? as a placeholder. <br>
+  5) Return an array of values that we'll be inserting into the database. We apply the map method to the columns array which applies a block to each element in the columns array and returns a new array of the transformed elements. Each column name should correspond to a key in the article object's attributes. The block takes each column name and applies the send method to the object. Because our model's Article class employs the attr_accessor method, we can treat each attribute name as a getter or setter method. Applying the send method on the object with the column name as the key will return the attribute's value. Thus we get an array of the object's values for each column name. <br>
+  6) Return a string of the column names joined by commas. We'll use this for the database insert.<br>
+  7) Execute the SQL INSERT statement on the database. Now a copy of the object is persisted as a row in the database.<br>
+  8) We could stop here but if we want to do a redirect in the controller to the new article's show page then we need the new article's id. The database generates that for us but doesn't return it when we do an insert. We need to do a separate query. The last_insert_rowid returns the id of the last row created, which we assign to our original object.<br>
+  9) Log the SQL statement to the terminal using puts. The <i>values</i> variable is an array and <i>puts</i> can only print strings so we have to convert it to a string with <i>values.to_s</i>.
+  10-11) We return the original object, including the new id assigned to it by the database. The articles controller index action can now do a redirect to the new article's show page using <i>@article.id</i>.
+</p><br>
+
+<b>Update:</b>
+<p>When a user wants to modify an article, they click the edit link which takes them to a page with an edit form populated with the @article values. The article's edit and update controller actions are below:</p>
+<pre>
+def edit
+  @article = Article.find(params[:id])
+  render
+end
+
+def update
+  @article = Article.find(params[:id])
+  @article.update(title: params['article']['title'], content: params['article']['content'])
+  redirect_to "/articles/#{@article.id}"
+end
+</pre>
+<p>The @article instance variable contains the requested article object. The second statement in the update action applies the update method to the @article object making update an <b>instance</b> method. It passes two key value pairs as arguments for title and content. The values are taken from the submitted edit form. The values are sent from the client in the HTTP request data and accessed as params. The update method is defined in the HacktiveRecord::Base class:</p>
+<pre>
+def update(attributes={})
+  columns = attributes.keys                                   # 1
+  columns = columns.map { |column| "#{column}=?" }.join(",")  # 2
+  values = attributes.values                                  # 3
+  values << id                                                # 4
+  DB.execute("UPDATE #{self.class.table} SET #{columns} WHERE id = ?", values) # 5
+  puts("\s #{self.class} SQL Statement: UPDATE #{self.class.table} SET #{columns} WHERE id = ?" + values.to_s) # 6
+end
+</pre>
+<p>The update method takes one argument, <i>attributes</i>, which has a default value of an empty hash. The two key:value pairs sent as arguments are received in the attributes parameter hash. <br>
+  1) Apply the keys method to the attributes hash giving us an array of the column names. <br>
+  2) Use the map method to transform the array into a string that looks like: title=?,content=?. This is going to be a prepared statement using ? as placeholders for the values. <br>
+  3) Get the values by applying the values method to our <i>attributes</i> array.<br>
+  4) We did not pass in the id as an argument in the update method because we don't want a user to change the id. But our database query will use the id in the <i>where</i> clause. The <i>where</i> clause in our database update also uses a ? placeholder, so we'll tack on the object's id value to the <i>values</i> array. Since this is an instance method, <i>id</i> is taken from the receiver instance <i>@article</i>. <br>
+  5) Execute the SQL statement to update the database.
+  6) Log the SQL statement to the terminal with puts.
+</p><br>
+
+<b>Destroy:</b>
+<p>If a user clicks on the delete link on an article's show page it will be routed to the articles controller destroy action. The first statement uses the find method to create an article object assigned to @article. The second statement chains the destory method to it.</p>
+<pre>
+def destroy
+  @article = Article.find(params[:id])
+  @article.destroy
+  redirect_to("/articles")
+end
+</pre>
+<p>Since the Article object <i>@article</i> is the receiver, destroy is an instance method. It is defined in the HacktiveRecord::Base class:</p>
+<pre>
+def destroy
+  DB.execute("DELETE FROM #{self.class.table} WHERE id = ?", id)
+  puts("\s #{self.class} SQL Statement: DELETE FROM #{self.class.table} WHERE id = #{id}")
+end
+</pre>
+<p>This method simply executes a database delete using the object's id attribute. Then logs it to the terminal.</p><br>
+
+<p>Now restart the server (Control+C to stop, <code>rackup</code> to restart). Cross your fingers, then refresh your browser. Try out the shiny new RESTful resources to view all articles, view one, create a new article, edit it, then delete it. Sweet.</p>
+
+<hr class="space">
+<p>That concludes the resource, model and database portion of this tutorial. For added practice there's an optional Part b to this section that shows you some other things you can do, like use Active Record as your ORM. <br>
+<b><a href="build_rails_5b">Models and Persistence - Bonus Section</a></b></p>
+<p>The next section is a short one on our Support module.
+</p>
+<hr>
+<p><a href="build_rails_6">On to Part 6 - Support Module</a></p>
+</div>
+</div>
+</body>
+</html>
