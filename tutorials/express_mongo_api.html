@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
   <link rel="stylesheet" href="../stylesheets/style.css">
   <script src="../javascripts/includes.js" defer></script>
+  <script src="../javascripts/mongo.js" defer></script>
 </head>
   <body class="body-bg">
     <header id="header"></header>
@@ -111,12 +112,6 @@ app.listen(PORT, function() { console.log(`Server listening on port ${PORT}`) })
 
 <hr>
 <div id="mongo"></div>
-<script>
-const partial = document.getElementById('mongo');
-fetch('_mongo.html')
-  .then((response) => response.text())
-  .then((body) => partial.innerHTML = body);
-</script>
 
 <hr>
 <h4>Mongoose ORM</h4>
