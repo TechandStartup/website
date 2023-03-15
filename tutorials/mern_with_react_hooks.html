@@ -8,7 +8,6 @@
   <link rel="stylesheet" href="../bootstrap/css/bootstrap.min.css">
   <link rel="stylesheet" href="../stylesheets/style.css">
   <script src="../javascripts/includes.js" defer></script>
-  <script src="../javascripts/npm-run-dev.js" defer></script>
 </head>
   <body class="body-bg">
     <header id="header"></header>
@@ -699,7 +698,27 @@ export default ArticleEdit;
 <p><b>This completes the React portion of this app!</b></p>
 
 <!-- npm run dev -->
-<div id="npm-run-dev"></div>
+<hr class="space" id='npm-run-dev'>
+<h4>Run the API and React Client with one command</h4>
+<p class='mb-1'>Right now we need separate terminal windows open to run our back end API server (port 3001) and our front end React app (port 3000). Not to mention our MongoDB server. For convenience we can run our API and React apps with one command using the Concurrently package. Make sure you are in the project's root directory (not in the client folder). Using the --dev flag installs it as a development environment dependency.</p> 
+<li class="dlr"><code>npm install concurrently --save-dev</code></li>
+<p class='mt-3 mb-1'></p>
+Open the package.json file in the project's root directory (not the one in the client folder) and add the highlighted script below. Note that you need to add a comma after the start script.</p>
+<pre>
+<span>// package.json</span>
+  ...
+  "scripts": {
+    "start": "node server.js"<b>,
+    "dev": "concurrently \"nodemon server.js\" \"cd client && npm run start\""</b>
+  },
+  ...
+  "devDependencies": {
+    "concurrently": "^4.1.1"
+  },
+</pre>
+<p class='mb-1'>This will run the nodemon command on the API application starting the server on port 3001. Then it will cd to the client directory and run the start command which will run the React app on port 3000. To execute this script, make sure you stop both servers first, then from the project's root directory run:</p>
+<li class="dlr"><code>npm run dev</code></li>
+<p class='mt-3'>This should start both servers and open the React app in your browser.</p>
 
 <hr>
 <p>Well now you have a fully functioning MERN app using React Hooks. To put it in production one option is to use Heroku. To find out how to do that go to the optional final part of this MERN tutorial series <a href="mern_heroku">Deploy a MERN app to Heroku</a></p>
