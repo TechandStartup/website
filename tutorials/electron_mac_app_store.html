@@ -15,7 +15,7 @@
 
 <div class="page-header">
   <h1>How to Release an Electron App on the Mac App Store</h1>
-  <p>By Steve Carey - Last updated Apr 13, 2022. Originally published Feb 4, 2020.</p>
+  <p>By Steve Carey - Last updated March 15, 2023. Originally published Feb 4, 2020.</p>
   <p>Example Code: <a href="https://github.com/steve981cr/electron-quickstart-mas">Github</a></p>
 </div>
 
@@ -49,6 +49,8 @@
   <li><b>Distribution:</b> used to sign apps submitted to the Mac App Store.</li>
   <li><b>Mac Installer Distribution:</b> used to sign the Mac Installer Package in addition to the app itself.</li>
 </ul>
+
+<p>You can create the signing certificates with either XCode or using the Keychain Access app</p>
 
 <h4>Using XCode</h4>
 <p>Create and install these three certificates with XCode. Repeat the below process for each certificate.</p>
@@ -263,14 +265,24 @@ Reference: <a href="https://electronjs.org/docs/tutorial/mac-app-store-submissio
 <h3>9) Generate two Provisioning Profiles (AppleDevelopment and MacAppStore)</h3>
 <p>Repeat the below steps for Apple Development and Mac App Store</p>
 <li>Go to your apple developer account profiles page <a href="https://developer.apple.com/account/resources/profiles/list">developer.apple.com/account/resources/profiles/list</a></li>
+
+<h4>9a) Generate the AppleDevelopment Provisioning Profile</h4>
 <li>Click the + sign to add a new profile which will take you to the "Register a New Provisioning Profile" page.</li> 
-<li>Select either macOS App Development or Mac App Store. Then click Continue.</li>
-<li>Select your appID and continue.</li>
-<li>Select your Mac App Distribution certificate and continue.  </li>
-<li>Give it a recognizable name like "AppleDevelopment" or "MacAppStore" then download it to your computer.</li> 
-<li>Double click the file to install it, then place it in the project's build directory. The file name would be AppleDevelopment.provisionprofile or MacAppStore.provisionprofile. This corresponds to the provisioningProfile key in the package.json file. Whatever you name it, during the build process it gets renamed to embedded.provisionprofile.</li> 
-<li>This is a binary file. If you want to read it's contents in XML format and you have X-Code's Command Line utilities installed, from the Terminal run the appropriate below command depending on the file name: </li>
+<li>Select either macOS App Development. Then click Continue.</li>
+<li>Select your appID, then click continue.</li>
+<li>Give it a recognizable name like "AppleDevelopment", then download it to your computer.</li> 
+<li>Double click the file to install it, then place it in the project's build directory. The file name would be AppleDevelopment.provisionprofile. This corresponds to the provisioningProfile key in the package.json file. Whatever you name it, during the build process it gets renamed to embedded.provisionprofile.</li> 
+<li>This is a binary file. If you want to read it's contents in XML format and you have X-Code's Command Line utilities installed, from the Terminal in the project folder run the below command: </li>
 <li class="dlr"><code>security cms -D -i build/AppleDevelopment.provisionprofile</code></li>
+
+<h4>9b) Generate the MacAppStore Provisioning Profile</h4>
+<li>Click the + sign to add a new profile which will take you to the "Register a New Provisioning Profile" page.</li> 
+<li>Select Mac App Store. Then click Continue.</li>
+<li>Select your appID, then click continue.</li>
+<li>Select your Mac App Distribution certificate, then click continue.</li>
+<li>Give it a recognizable name like "MacAppStore", then download it to your computer.</li> 
+<li>Double click the file to install it, then place it in the project's build directory. The file name would be MacAppStore.provisionprofile. This corresponds to the provisioningProfile key in the package.json file. Whatever you name it, during the build process it gets renamed to embedded.provisionprofile.</li> 
+<li>This is a binary file. If you want to read it's contents in XML format and you have X-Code's Command Line utilities installed, from the Terminal in the project folder run the below command: </li>
 <li class="dlr"><code>security cms -D -i build/MacAppStore.provisionprofile</code></li>
 
 <hr>
